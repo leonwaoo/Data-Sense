@@ -1,0 +1,27 @@
+data_venda,regiao,estado,cidade,produto,categoria,quantidade,preco_unitario,desconto,faturamento,canal_venda,vendedor
+2026-01-03,Sudeste,SP,Sao Paulo,Notebook Pro,Eletronicos,2,5200,0.05,9880,Online,Ana
+2026-01-05,Sudeste,MG,Uberlandia,Monitor 27,Eletronicos,4,1300,0.10,4680,Loja,Bruno
+2026-01-08,Sul,PR,Curitiba,Cadeira Ergo,Moveis,5,780,0.00,3900,Representante,Camila
+2026-01-12,Nordeste,BA,Salvador,Mouse Sem Fio,Acessorios,18,120,0.05,2052,Online,Diego
+2026-01-15,Sudeste,RJ,Rio de Janeiro,Notebook Pro,Eletronicos,1,5200,0.00,5200,Loja,Ana
+2026-01-20,Centro-Oeste,GO,Goiania,Teclado Mecanico,Acessorios,9,340,0.08,2815.2,Online,Eduarda
+2026-02-02,Sudeste,MG,Belo Horizonte,Servidor Mini,Eletronicos,1,18500,0.03,17945,Representante,Felipe
+2026-02-07,Sul,SC,Florianopolis,Cadeira Ergo,Moveis,3,780,0.05,2223,Loja,Camila
+2026-02-11,Norte,PA,Belem,Monitor 27,Eletronicos,2,1300,0.00,2600,Online,Bruno
+2026-02-18,Nordeste,PE,Recife,Headset Pro,Acessorios,12,260,0.10,2808,Online,Diego
+2026-03-01,Sudeste,SP,Sao Paulo,Notebook Pro,Eletronicos,3,5200,0.07,14508,Representante,Ana
+2026-03-04,Sudeste,MG,Uberlandia,Mesa Ajustavel,Moveis,2,1600,0.00,3200,Loja,Eduarda
+2026-03-10,Sul,RS,Porto Alegre,Headset Pro,Acessorios,7,260,0.00,1820,Online,Diego
+2026-03-15,Centro-Oeste,DF,Brasilia,Monitor 27,Eletronicos,6,1300,0.12,6864,Representante,Bruno
+2026-03-22,Nordeste,CE,Fortaleza,Mouse Sem Fio,Acessorios,22,120,0.05,2508,Online,Camila
+2026-04-02,Sudeste,SP,Sao Paulo,Servidor Mini,Eletronicos,1,18500,0.00,18500,Representante,Felipe
+2026-04-08,Sul,PR,Curitiba,Mesa Ajustavel,Moveis,4,1600,0.08,5888,Loja,Eduarda
+2026-04-14,Norte,AM,Manaus,Teclado Mecanico,Acessorios,5,340,0.00,1700,Online,Diego
+2026-04-20,Sudeste,RJ,Rio de Janeiro,Monitor 27,Eletronicos,3,1300,0.05,3705,Loja,Bruno
+2026-04-26,Nordeste,BA,Salvador,Cadeira Ergo,Moveis,2,780,0.00,1560,Representante,Camila
+2026-05-03,Sudeste,MG,Uberlandia,Notebook Pro,Eletronicos,2,5200,,10400,Online,Ana
+2026-05-09,Sul,SC,Florianopolis,Mouse Sem Fio,Acessorios,15,120,0.04,1728,Online,Diego
+2026-05-14,Centro-Oeste,GO,Goiania,Headset Pro,Acessorios,8,260,0.05,1976,Loja,Eduarda
+2026-05-19,Norte,PA,Belem,Mesa Ajustavel,Moveis,1,1600,0.00,1600,Representante,
+2026-05-25,Sudeste,SP,Sao Paulo,Servidor Mini,Eletronicos,5,18500,0.00,92500,Representante,Felipe
+2026-05-25,Sudeste,SP,Sao Paulo,Servidor Mini,Eletronicos,5,18500,0.00,92500,Representante,Felipe

@@ -917,6 +917,148 @@ h2 {
   color: #0f172a;
 }
 
+.audit-loading,
+.quality-audit-panel {
+  background: #f8fafc;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  color: #475569;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.quality-audit-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.quality-audit-panel > p {
+  color: #334155;
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.quality-audit-header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.quality-audit-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.quality-audit-header span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.quality-audit-header strong {
+  color: #0f172a;
+  font-size: 1.45rem;
+}
+
+.audit-mode {
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  color: #0f766e;
+  font-size: 0.76rem;
+  font-weight: 900;
+  max-width: 180px;
+  overflow-wrap: anywhere;
+  padding: 5px 8px;
+  text-align: right;
+}
+
+.audit-mode.status-failed,
+.audit-error {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.audit-mode.status-not_configured,
+.audit-mode.status-disabled {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+.quality-findings {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-finding {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #64748b;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+}
+
+.quality-finding.severity-critical {
+  border-left-color: #dc2626;
+}
+
+.quality-finding.severity-warning {
+  border-left-color: #d97706;
+}
+
+.quality-finding.severity-info {
+  border-left-color: #2563eb;
+}
+
+.quality-finding div {
+  display: grid;
+  gap: 4px;
+}
+
+.quality-finding span {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.quality-finding strong {
+  color: #0f172a;
+}
+
+.quality-finding p,
+.quality-finding small,
+.quality-finding li {
+  color: #475569;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.quality-finding small {
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.quality-finding ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.audit-error {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  padding: 8px;
+}
+
 .suggestions button {
   background: #f8fafc;
   border: 1px solid #dbe5ef;

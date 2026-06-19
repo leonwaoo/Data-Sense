@@ -77,6 +77,29 @@ type Quality = {
   recommendations: string[];
 };
 
+type QualityAuditFinding = {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  category: string;
+  title: string;
+  detail: string;
+  recommendation: string;
+  evidence: string[];
+};
+
+type QualityAudit = {
+  mode: "rules" | "ai";
+  ai_enabled: boolean;
+  ai_status: "not_configured" | "disabled" | "failed" | "completed";
+  ai_error?: string;
+  model: string | null;
+  analysis_score: number;
+  summary: string;
+  findings: QualityAuditFinding[];
+  recommendations: string[];
+  checks: Record<string, unknown>;
+};
+
 type ChartPayload = {
   type: string;
   x: string;
@@ -250,8 +273,10 @@ export function App() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [chartSuggestions, setChartSuggestions] = useState<ChartSuggestion[]>([]);
+  const [qualityAudit, setQualityAudit] = useState<QualityAudit | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [isQualityAuditLoading, setIsQualityAuditLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | null>(null);
@@ -279,6 +304,7 @@ export function App() {
     setAnswer(null);
     setDashboard(null);
     setChartSuggestions([]);
+    setQualityAudit(null);
     setDashboardFilters(defaultDashboardFilters);
 
     const formData = new FormData();
@@ -302,12 +328,15 @@ export function App() {
         title: `Dashboard - ${uploadPayload.file_name.replace(/\.[^.]+$/, "")}`,
       }));
       setIsDashboardLoading(true);
-      const [suggestions, dashboardPayload] = await Promise.all([
+      setIsQualityAuditLoading(true);
+      const [suggestions, dashboardPayload, auditPayload] = await Promise.all([
         fetchChartSuggestions(uploadPayload.dataset_id).catch(() => []),
         fetchDashboard(uploadPayload.dataset_id).catch(() => null),
+        fetchQualityAudit(uploadPayload.dataset_id).catch(() => null),
       ]);
       setChartSuggestions(suggestions);
       setDashboard(dashboardPayload);
+      setQualityAudit(auditPayload);
       if (dashboardPayload) {
         setHistory(saveHistory(uploadPayload, dashboardPayload));
       }
@@ -316,6 +345,7 @@ export function App() {
     } finally {
       setIsUploading(false);
       setIsDashboardLoading(false);
+      setIsQualityAuditLoading(false);
     }
   }
 
@@ -373,6 +403,13 @@ export function App() {
 
     if (!response.ok) return null;
     return (await response.json()) as DashboardPayload;
+  }
+
+  async function fetchQualityAudit(datasetId: string) {
+    const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/quality/audit`);
+
+    if (!response.ok) return null;
+    return (await response.json()) as QualityAudit;
   }
 
   async function handleApplyDashboardFilters(filters: DashboardFilters) {
@@ -606,16 +643,20 @@ export function App() {
         <div className="panel">
           <div className="panel-heading">
             <h2>Auditoria de qualidade</h2>
-            <span>{dataset ? `${dataset.quality.missing_total} nulos` : "Sem dados"}</span>
+            <span>{qualityAudit ? `${qualityAudit.analysis_score}/100 analise` : dataset ? `${dataset.quality.missing_total} nulos` : "Sem dados"}</span>
           </div>
           {dataset ? (
-            <div className="quality-list">
-              <strong>Duplicatas: {dataset.quality.duplicate_rows}</strong>
-              <strong>Colunas vazias: {dataset.quality.empty_columns.length}</strong>
-              {dataset.quality.recommendations.map((recommendation) => (
-                <p key={recommendation}>{recommendation}</p>
-              ))}
-            </div>
+            <>
+              <div className="quality-list">
+                <strong>Duplicatas: {dataset.quality.duplicate_rows}</strong>
+                <strong>Colunas vazias: {dataset.quality.empty_columns.length}</strong>
+                {dataset.quality.recommendations.map((recommendation) => (
+                  <p key={recommendation}>{recommendation}</p>
+                ))}
+              </div>
+              {isQualityAuditLoading ? <div className="audit-loading">Revisando confiabilidade da analise...</div> : null}
+              {qualityAudit ? <QualityAuditView audit={qualityAudit} /> : null}
+            </>
           ) : (
             <EmptyState text="A auditoria sera gerada automaticamente apos o upload." />
           )}
@@ -697,6 +738,55 @@ function MetricCard({ icon, label, value }: { icon: ReactNode; label: string; va
 
 function EmptyState({ text }: { text: string }) {
   return <div className="empty-state">{text}</div>;
+}
+
+function QualityAuditView({ audit }: { audit: QualityAudit }) {
+  const severityLabels: Record<QualityAuditFinding["severity"], string> = {
+    critical: "Critico",
+    warning: "Atencao",
+    info: "Info",
+  };
+  const statusLabel =
+    audit.ai_status === "completed"
+      ? `IA ativa${audit.model ? ` - ${audit.model}` : ""}`
+      : audit.ai_status === "failed"
+        ? "IA indisponivel"
+        : audit.ai_status === "disabled"
+          ? "IA desativada"
+          : "Regras locais";
+
+  return (
+    <div className="quality-audit-panel">
+      <div className="quality-audit-header">
+        <div>
+          <span>Auditoria inteligente</span>
+          <strong>{audit.analysis_score}/100</strong>
+        </div>
+        <small className={`audit-mode status-${audit.ai_status}`}>{statusLabel}</small>
+      </div>
+      <p>{audit.summary}</p>
+      <div className="quality-findings">
+        {audit.findings.map((finding) => (
+          <article className={`quality-finding severity-${finding.severity}`} key={finding.id}>
+            <div>
+              <span>{severityLabels[finding.severity]}</span>
+              <strong>{finding.title}</strong>
+            </div>
+            <p>{finding.detail}</p>
+            <small>{finding.recommendation}</small>
+            {finding.evidence.length ? (
+              <ul>
+                {finding.evidence.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
+          </article>
+        ))}
+      </div>
+      {audit.ai_error ? <small className="audit-error">IA indisponivel: {audit.ai_error}</small> : null}
+    </div>
+  );
 }
 
 function HistoryPanel({ history, onClear }: { history: HistoryItem[]; onClear: () => void }) {

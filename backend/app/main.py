@@ -4,6 +4,7 @@ from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.services.analytics_service import answer_question
+from app.services.ai_quality_service import build_quality_audit
 from app.services.chart_service import suggest_charts
 from app.services.dashboard_service import build_dashboard
 from app.services.dataset_service import get_dataset, load_dataset, supported_formats
@@ -79,6 +80,11 @@ def dataset_preview(dataset_id: str, rows: int = 10) -> list[dict]:
 @app.get("/datasets/{dataset_id}/quality")
 def dataset_quality(dataset_id: str) -> dict:
     return build_quality_report(get_dataset(dataset_id))
+
+
+@app.get("/datasets/{dataset_id}/quality/audit")
+def dataset_quality_audit(dataset_id: str) -> dict:
+    return build_quality_audit(get_dataset(dataset_id))
 
 
 @app.post("/datasets/{dataset_id}/ask")

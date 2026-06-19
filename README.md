@@ -47,6 +47,8 @@ O sistema atuara como um assistente para analise de dados:
 - Permite personalizar o dashboard com titulo, tema, logo, tipo de grafico, ordem dos graficos e graficos ocultos.
 - Recalcula o dashboard com filtros de periodo e categorias, como produto, fornecedor, cliente, categoria, regiao ou canal.
 - Detecta anomalias e problemas de qualidade.
+- Gera uma auditoria inteligente da confiabilidade da analise, apontando cabecalho suspeito, datas como texto, metricas inadequadas, totais negativos, nulos, duplicatas e outliers.
+- Pode usar IA para revisar a auditoria quando `OPENAI_API_KEY` estiver configurada; sem chave, usa regras locais.
 - Sugere proximas analises e recomendacoes de negocio.
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
 - Renderiza graficos reais no relatorio, com mensagem clara quando nao ha dados suficientes para desenhar uma visualizacao.
@@ -96,6 +98,15 @@ A API ficara disponivel em:
 
 - `http://127.0.0.1:8000/health`
 - `http://127.0.0.1:8000/docs`
+
+Para ativar a revisao de qualidade com IA no backend, configure:
+
+```bash
+OPENAI_API_KEY=sua_chave_openai
+OPENAI_MODEL=gpt-5.4-mini
+```
+
+Se `OPENAI_API_KEY` nao existir, a rota de auditoria usa somente regras locais e segue funcionando normalmente.
 
 ### Frontend
 

@@ -90,6 +90,7 @@ export function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -208,6 +209,35 @@ export function App() {
     }
   }
 
+  async function handleDownloadReport(format: "pdf" | "png") {
+    if (!dataset) return;
+
+    setExportingFormat(format);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/report.${format}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.detail || "Nao foi possivel gerar o relatorio.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `datasense-relatorio-${dataset.file_name.replace(/\.[^.]+$/, "")}.${format}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (reportError) {
+      setError(reportError instanceof Error ? reportError.message : "Erro inesperado ao gerar relatorio.");
+    } finally {
+      setExportingFormat(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="topbar">
@@ -281,6 +311,26 @@ export function App() {
           ))}
         </nav>
       </section>
+
+      {dataset ? (
+        <section className="report-strip">
+          <div>
+            <Download size={18} />
+            <strong>Relatorio exportavel</strong>
+            <span>Resumo, qualidade, insights, graficos e recomendacoes</span>
+          </div>
+          <div className="report-actions">
+            <button disabled={!!exportingFormat} onClick={() => void handleDownloadReport("pdf")} type="button">
+              <Download size={16} />
+              {exportingFormat === "pdf" ? "Gerando PDF..." : "Baixar PDF"}
+            </button>
+            <button disabled={!!exportingFormat} onClick={() => void handleDownloadReport("png")} type="button">
+              <Download size={16} />
+              {exportingFormat === "png" ? "Gerando PNG..." : "Baixar PNG"}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="workspace-grid">
         <div className="panel">

@@ -42,6 +42,7 @@ O sistema atuara como um assistente para analise de dados:
 - Gera consultas, tabelas resumidas, graficos e explicacoes para dados de vendas, compras, clientes, fornecedores, categorias e regioes.
 - Detecta anomalias e problemas de qualidade.
 - Sugere proximas analises e recomendacoes de negocio.
+- Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
 
 ## Documentacao
 
@@ -175,3 +176,5 @@ Perguntas úteis para teste:
 ## Status
 
 Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, auditoria de qualidade, chat analitico e sugestoes de graficos.
+
+Tambem ja possui exportacao de relatorio em PDF/PNG apos o carregamento do dataset.

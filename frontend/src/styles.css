@@ -201,7 +201,8 @@ h2 {
 .metric-card,
 .panel,
 .insight-strip,
-.sample-strip {
+.sample-strip,
+.report-strip {
   background: #ffffff;
   border: 1px solid #dbe5ef;
   border-radius: 8px;
@@ -324,6 +325,61 @@ h2 {
 
 .sample-action button:hover:not(:disabled) + a {
   border-color: #0f766e;
+}
+
+.report-strip {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.report-strip > div:first-child {
+  align-items: center;
+  color: #0f172a;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.report-strip > div:first-child svg {
+  color: #0f766e;
+}
+
+.report-strip span {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.report-actions button {
+  align-items: center;
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  border-radius: 8px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 850;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.report-actions button:hover:not(:disabled) {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+.report-actions button:disabled {
+  cursor: progress;
+  opacity: 0.72;
 }
 
 .panel {
@@ -531,7 +587,8 @@ th {
 
   .panel-heading,
   .insight-strip,
-  .sample-strip {
+  .sample-strip,
+  .report-strip {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -541,6 +598,10 @@ th {
   }
 
   .sample-strip nav {
+    justify-content: flex-start;
+  }
+
+  .report-actions {
     justify-content: flex-start;
   }
 

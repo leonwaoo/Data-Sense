@@ -2,7 +2,7 @@
 
 Projeto de portfolio em Data Science e Gestao da Informacao.
 
-O DataSense e uma aplicacao onde o usuario faz upload de um arquivo CSV e conversa com os dados em linguagem natural. A ferramenta gera respostas analiticas, graficos, insights, auditoria de qualidade dos dados e recomendacoes praticas.
+O DataSense e uma aplicacao onde o usuario faz upload de uma planilha ou arquivo tabular e conversa com os dados em linguagem natural. A ferramenta gera respostas analiticas, graficos, insights, auditoria de qualidade dos dados e recomendacoes praticas.
 
 ## Links
 
@@ -24,16 +24,16 @@ Criar um produto demonstravel para entrevistas e processos seletivos, mostrando 
 
 ## Problema
 
-Muitas pessoas e empresas possuem dados em planilhas, mas nao sabem transformar esses dados rapidamente em perguntas respondidas, graficos, diagnosticos e decisoes. O projeto resolve esse problema oferecendo uma experiencia simples: enviar um CSV, perguntar em linguagem natural e receber uma analise confiavel.
+Muitas pessoas e empresas possuem dados em planilhas, mas nao sabem transformar esses dados rapidamente em perguntas respondidas, graficos, diagnosticos e decisoes. O projeto resolve esse problema oferecendo uma experiencia simples: enviar CSV, Excel, TSV, TXT ou JSON tabular, perguntar em linguagem natural e receber uma analise confiavel.
 
 ## Solucao
 
 O sistema atuara como um assistente para analise de dados:
 
-- Le o CSV enviado pelo usuario.
+- Le CSV, TSV, TXT delimitado, Excel e JSON tabular enviados pelo usuario.
 - Identifica colunas, tipos de dados, valores ausentes e possiveis problemas.
 - Permite perguntas em linguagem natural sobre os dados.
-- Gera consultas, tabelas resumidas, graficos e explicacoes.
+- Gera consultas, tabelas resumidas, graficos e explicacoes para dados de vendas, compras, clientes, fornecedores, categorias e regioes.
 - Detecta anomalias e problemas de qualidade.
 - Sugere proximas analises e recomendacoes de negocio.
 
@@ -129,6 +129,16 @@ Deploy atual:
 
 - `https://data-sense-three.vercel.app/`
 
+### Formatos aceitos
+
+- CSV (`.csv`)
+- TSV (`.tsv`)
+- TXT delimitado (`.txt`)
+- Excel (`.xlsx` e `.xls`)
+- JSON tabular (`.json`)
+
+O limite inicial de upload e de 15 MB.
+
 ### Dataset demonstrativo
 
 Use o arquivo:
@@ -139,4 +149,4 @@ Ele possui vendas ficticias com produto, categoria, regiao, faturamento, valores
 
 ## Status
 
-Fase atual: MVP funcional em desenvolvimento, com upload de CSV, perfil automatico, auditoria de qualidade, chat analitico e sugestoes de graficos.
+Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, auditoria de qualidade, chat analitico e sugestoes de graficos.

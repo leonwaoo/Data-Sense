@@ -1,11 +1,16 @@
-import { BarChart3, Database, FileQuestion, FileUp, Lightbulb, ShieldCheck, Sparkles } from "lucide-react";
-import type { ReactNode } from "react";
+import { BarChart3, Database, FileQuestion, FileSpreadsheet, Lightbulb, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import type { DragEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.PROD ? "https://data-sense-api.onrender.com" : "http://127.0.0.1:8000");
+
+const SUPPORTED_FILE_ACCEPT =
+  ".csv,.tsv,.txt,.xlsx,.xls,.json,text/csv,text/tab-separated-values,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+type CellValue = string | number | boolean | null;
 
 type Profile = {
   dataset_id: string;
@@ -45,8 +50,9 @@ type UploadResponse = {
   dataset_id: string;
   file_name: string;
   profile: Profile;
-  preview: Record<string, string | number | null>[];
+  preview: Record<string, CellValue>[];
   quality: Quality;
+  supported_formats?: string[];
 };
 
 type ChartSuggestion = {
@@ -61,9 +67,11 @@ const suggestedQuestions = [
   "Quantas linhas e colunas existem?",
   "Qual coluna tem mais valores ausentes?",
   "Existem duplicatas?",
-  "Quais sao os top 5 produtos por faturamento?",
-  "Mostre vendas por regiao.",
-  "Mostre vendas por mes.",
+  "Qual o total de vendas?",
+  "Mostre compras por mes.",
+  "Top 5 fornecedores por compras.",
+  "Mostre clientes por valor.",
+  "Mostre quantidade por categoria.",
 ];
 
 export function App() {
@@ -72,6 +80,7 @@ export function App() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [chartSuggestions, setChartSuggestions] = useState<ChartSuggestion[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,6 +121,24 @@ export function App() {
     } finally {
       setIsUploading(false);
     }
+  }
+
+  function handleDragOver(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (!isUploading) setIsDragOver(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsDragOver(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsDragOver(false);
+    if (isUploading) return;
+
+    void handleUpload(event.dataTransfer.files?.[0] ?? null);
   }
 
   async function fetchChartSuggestions(datasetId: string) {
@@ -158,25 +185,40 @@ export function App() {
             <img alt="" className="brand-mark" src="/brand-mark.svg" />
             <div>
               <p className="eyebrow">DataSense</p>
-              <strong>Analise assistida para CSVs</strong>
+              <strong>Analise assistida para planilhas</strong>
             </div>
           </div>
           <h1>Transforme planilhas em respostas, graficos e alertas de qualidade.</h1>
           <p className="hero-copy">
-            Envie um CSV, veja o perfil dos dados e faca perguntas analiticas com respostas calculadas diretamente no dataset.
+            Envie CSV, Excel, TSV ou JSON, veja o perfil dos dados e faca perguntas analiticas calculadas diretamente no dataset.
           </p>
         </div>
-        <label className="upload-button">
-          <FileUp size={18} />
-          {isUploading ? "Enviando..." : "Enviar CSV"}
-          <input accept=".csv,text/csv" disabled={isUploading} type="file" onChange={(event) => handleUpload(event.target.files?.[0] ?? null)} />
+        <label
+          className={`dropzone${isDragOver ? " is-dragover" : ""}${isUploading ? " is-uploading" : ""}`}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          <span className="dropzone-icon">{isUploading ? <FileSpreadsheet size={24} /> : <UploadCloud size={24} />}</span>
+          <strong>{isUploading ? "Enviando arquivo..." : "Arraste o arquivo aqui"}</strong>
+          <p>ou clique para selecionar uma planilha</p>
+          <small>CSV, TSV, TXT, XLSX, XLS ou JSON ate 15 MB</small>
+          <input
+            accept={SUPPORTED_FILE_ACCEPT}
+            disabled={isUploading}
+            type="file"
+            onChange={(event) => {
+              void handleUpload(event.target.files?.[0] ?? null);
+              event.currentTarget.value = "";
+            }}
+          />
         </label>
       </section>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
       <section className="summary-grid">
-        <MetricCard icon={<Database size={20} />} label="Dataset" value={dataset?.file_name ?? "Nenhum CSV"} />
+        <MetricCard icon={<Database size={20} />} label="Dataset" value={dataset?.file_name ?? "Nenhum arquivo"} />
         <MetricCard icon={<BarChart3 size={20} />} label="Linhas" value={dataset ? dataset.profile.rows.toLocaleString("pt-BR") : "-"} />
         <MetricCard icon={<FileQuestion size={20} />} label="Colunas" value={dataset ? String(dataset.profile.columns) : "-"} />
         <MetricCard icon={<ShieldCheck size={20} />} label="Qualidade" value={dataset ? `${dataset.quality.score}/100` : "-"} />
@@ -185,7 +227,7 @@ export function App() {
       <section className="insight-strip">
         <div>
           <Sparkles size={18} />
-          <span>{dataset ? "Dataset carregado e pronto para analise" : "Use o arquivo data/sample/vendas_demo.csv para testar o MVP"}</span>
+          <span>{dataset ? "Dataset carregado e pronto para analise" : "Teste com CSV, Excel, TSV, TXT ou JSON tabular"}</span>
         </div>
         <strong>{dataset ? `${dataset.profile.datetime_columns.length} data(s), ${dataset.profile.numeric_columns.length} metrica(s)` : "DataSense"}</strong>
       </section>
@@ -194,7 +236,7 @@ export function App() {
         <div className="panel">
           <div className="panel-heading">
             <h2>Perfil do dataset</h2>
-            <span>{dataset ? `${dataset.profile.numeric_columns.length} numericas` : "Aguardando CSV"}</span>
+            <span>{dataset ? `${dataset.profile.numeric_columns.length} numericas` : "Aguardando arquivo"}</span>
           </div>
           {dataset ? (
             <>
@@ -216,7 +258,7 @@ export function App() {
               </div>
             </>
           ) : (
-            <EmptyState text="Envie o CSV demonstrativo para ver colunas, nulos e preview." />
+            <EmptyState text="Envie uma planilha para ver colunas, nulos e preview." />
           )}
         </div>
 
@@ -263,7 +305,7 @@ export function App() {
       <section className="panel">
         <div className="panel-heading">
           <h2>Chat analitico</h2>
-          <span>{dataset ? "Perguntas suportadas" : "Envie um CSV primeiro"}</span>
+          <span>{dataset ? "Perguntas suportadas" : "Envie um arquivo primeiro"}</span>
         </div>
         <div className="suggestions">
           {suggestedQuestions.map((suggestion) => (
@@ -355,7 +397,7 @@ function AnswerChart({ chart }: { chart: ChartPayload }) {
   );
 }
 
-function DataTable({ rows }: { rows: Record<string, string | number | null>[] }) {
+function DataTable({ rows }: { rows: Record<string, CellValue>[] }) {
   if (!rows.length) return <EmptyState text="Sem linhas para exibir." />;
 
   const columns = Object.keys(rows[0]);
@@ -373,7 +415,7 @@ function DataTable({ rows }: { rows: Record<string, string | number | null>[] })
           {rows.map((row, index) => (
             <tr key={index}>
               {columns.map((column) => (
-                <td key={column}>{row[column] ?? "-"}</td>
+                <td key={column}>{row[column] == null ? "-" : String(row[column])}</td>
               ))}
             </tr>
           ))}

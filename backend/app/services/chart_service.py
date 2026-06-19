@@ -9,8 +9,26 @@ def suggest_charts(dataset: DatasetSession) -> list[dict]:
     datetime_columns = profile["datetime_columns"]
     suggestions: list[dict] = []
 
-    value_column = _first_matching(numeric_columns, ["faturamento", "receita", "valor", "quantidade"]) or (numeric_columns[0] if numeric_columns else None)
-    category_column = _first_matching(categorical_columns, ["produto", "categoria", "regiao", "estado"]) or (categorical_columns[0] if categorical_columns else None)
+    value_column = _first_matching(
+        numeric_columns,
+        [
+            "faturamento",
+            "receita",
+            "venda",
+            "compra",
+            "custo",
+            "despesa",
+            "valor",
+            "total",
+            "quantidade",
+            "qtd",
+            "amount",
+        ],
+    ) or (numeric_columns[0] if numeric_columns else None)
+    category_column = _first_matching(
+        categorical_columns,
+        ["produto", "item", "categoria", "fornecedor", "cliente", "regiao", "estado", "cidade", "canal", "status"],
+    ) or (categorical_columns[0] if categorical_columns else None)
 
     if category_column and value_column:
         suggestions.append(

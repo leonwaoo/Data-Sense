@@ -4,6 +4,12 @@ Projeto de portfolio em Data Science e Gestao da Informacao.
 
 O DataSense e uma aplicacao onde o usuario faz upload de um arquivo CSV e conversa com os dados em linguagem natural. A ferramenta gera respostas analiticas, graficos, insights, auditoria de qualidade dos dados e recomendacoes praticas.
 
+## Links
+
+- Site publicado: `https://data-sense-three.vercel.app/`
+- API publicada: `https://data-sense-api.onrender.com`
+- Documentacao da API: `https://data-sense-api.onrender.com/docs`
+
 ## Objetivo
 
 Criar um produto demonstravel para entrevistas e processos seletivos, mostrando habilidades em:
@@ -118,6 +124,10 @@ O arquivo `render.yaml` define a API como um Web Service Python:
 Configure a Vercel com root directory `frontend` e defina a variavel:
 
 - `VITE_API_BASE_URL`: URL publica da API no Render
+
+Deploy atual:
+
+- `https://data-sense-three.vercel.app/`
 
 ### Dataset demonstrativo
 

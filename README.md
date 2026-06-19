@@ -37,15 +37,19 @@ Muitas pessoas e empresas possuem dados em planilhas, mas nao sabem transformar 
 O sistema atuara como um assistente para analise de dados:
 
 - Le CSV, TSV, TXT delimitado, Excel e JSON tabular enviados pelo usuario.
+- Detecta melhor o cabecalho real em planilhas Excel que possuem linha de titulo antes da tabela.
 - Identifica colunas, tipos de dados, valores ausentes e possiveis problemas.
+- Sugere conversao para colunas de periodo, como mes e trimestre, quando elas aparecem como texto.
 - Permite perguntas em linguagem natural sobre os dados.
 - Gera consultas, tabelas resumidas, graficos e explicacoes para dados de vendas, compras, clientes, fornecedores, categorias e regioes.
+- Prioriza metricas de negocio, como receita/faturamento/valor total, evitando somar NF, prazo, avaliacao ou desconto por engano.
 - Monta um dashboard automatico apos o upload com KPIs, evolucao mensal, rankings, nulos e score de qualidade.
 - Permite personalizar o dashboard com titulo, tema, logo, tipo de grafico, ordem dos graficos e graficos ocultos.
 - Recalcula o dashboard com filtros de periodo e categorias, como produto, fornecedor, cliente, categoria, regiao ou canal.
 - Detecta anomalias e problemas de qualidade.
 - Sugere proximas analises e recomendacoes de negocio.
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
+- Renderiza graficos reais no relatorio, com mensagem clara quando nao ha dados suficientes para desenhar uma visualizacao.
 - Exporta o dashboard personalizado em PDF via impressao e PNG gerado no navegador.
 - Mantem historico local das ultimas analises carregadas.
 

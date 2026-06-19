@@ -60,6 +60,12 @@ type Profile = {
   numeric_columns: string[];
   categorical_columns: string[];
   datetime_columns: string[];
+  date_conversion_suggestions?: {
+    column: string;
+    suggested_type: string;
+    confidence: number;
+    message: string;
+  }[];
   missing_values: Record<string, number>;
 };
 
@@ -572,6 +578,14 @@ export function App() {
                   <span key={column}>{column}</span>
                 ))}
               </div>
+              {dataset.profile.date_conversion_suggestions?.length ? (
+                <div className="date-suggestion-list">
+                  <strong>Sugestoes de conversao de data</strong>
+                  {dataset.profile.date_conversion_suggestions.map((suggestion) => (
+                    <p key={suggestion.column}>{suggestion.message}</p>
+                  ))}
+                </div>
+              ) : null}
               <div className="chart-box">
                 <ResponsiveContainer height={220} width="100%">
                   <BarChart data={missingChartData}>

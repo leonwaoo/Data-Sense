@@ -6,7 +6,21 @@ import pandas as pd
 
 from app.models import DatasetSession
 
-SALES_CANDIDATES = ["faturamento", "receita", "venda", "vendas", "valor_venda", "sales", "revenue"]
+SALES_CANDIDATES = [
+    "valor_total",
+    "total_venda",
+    "valor_liquido",
+    "valor_bruto",
+    "faturamento",
+    "receita",
+    "receita_bruta",
+    "receita_liquida",
+    "venda",
+    "vendas",
+    "valor_venda",
+    "sales",
+    "revenue",
+]
 PURCHASE_CANDIDATES = ["compra", "compras", "valor_compra", "custo", "custos", "despesa", "gasto", "purchase", "cost"]
 QUANTITY_CANDIDATES = ["quantidade", "qtd", "volume", "unidade", "unidades", "units"]
 VALUE_CANDIDATES = SALES_CANDIDATES + PURCHASE_CANDIDATES + [
@@ -19,6 +33,25 @@ VALUE_CANDIDATES = SALES_CANDIDATES + PURCHASE_CANDIDATES + [
     "lucro",
     "margem",
 ]
+METRIC_NOISE_TERMS = [
+    "id",
+    "codigo",
+    "cod",
+    "nf",
+    "nota_fiscal",
+    "numero",
+    "prazo",
+    "dias",
+    "avaliacao",
+    "rating",
+    "mes",
+    "ano",
+    "trim",
+    "trimestre",
+    "percentual",
+    "taxa",
+]
+NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento"]
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 GROUP_CANDIDATES = [
     ("produto", ["produto", "item", "sku", "servico", "produto_servico"]),
@@ -131,7 +164,7 @@ def _monthly_response(dataset: DatasetSession, date_column: str, value_column: s
     df = dataset.dataframe.copy()
     parsed_default = pd.to_datetime(df[date_column], errors="coerce")
     parsed_dayfirst = pd.to_datetime(df[date_column], errors="coerce", dayfirst=True)
-    parsed_dates = parsed_dayfirst if parsed_dayfirst.notna().sum() >= parsed_default.notna().sum() else parsed_default
+    parsed_dates = parsed_dayfirst if parsed_dayfirst.notna().sum() > parsed_default.notna().sum() else parsed_default
     df = df.assign(_mes=parsed_dates.dt.to_period("M").astype(str))
     df = df[df["_mes"].ne("NaT")]
 
@@ -221,15 +254,55 @@ def _select_metric_column(df: pd.DataFrame, normalized_question: str) -> str | N
             return column
 
     if any(term in normalized_question for term in ["compra", "compras", "fornecedor", "custo", "despesa", "gasto"]):
-        return _find_column(numeric_columns, PURCHASE_CANDIDATES) or _find_column(numeric_columns, VALUE_CANDIDATES)
+        return _best_metric_column(df, numeric_columns, PURCHASE_CANDIDATES, domain="compras")
 
     if any(term in normalized_question for term in ["venda", "vendas", "receita", "faturamento", "cliente"]):
-        return _find_column(numeric_columns, SALES_CANDIDATES) or _find_column(numeric_columns, VALUE_CANDIDATES)
+        return _best_metric_column(df, numeric_columns, SALES_CANDIDATES, domain="vendas")
 
     if any(term in normalized_question for term in ["quantidade", "qtd", "volume", "unidade"]):
-        return _find_column(numeric_columns, QUANTITY_CANDIDATES) or _find_column(numeric_columns, VALUE_CANDIDATES)
+        return _best_metric_column(df, numeric_columns, QUANTITY_CANDIDATES, domain="quantidade")
 
-    return _find_column(numeric_columns, VALUE_CANDIDATES) or numeric_columns[0]
+    return _best_metric_column(df, numeric_columns, VALUE_CANDIDATES, domain="generico")
+
+
+def _best_metric_column(df: pd.DataFrame, numeric_columns: list[str], candidates: list[str], domain: str) -> str | None:
+    scored_columns = [(_metric_score(df, column, candidates, domain), column) for column in numeric_columns]
+    scored_columns.sort(reverse=True)
+    if scored_columns and scored_columns[0][0] > 0:
+        return scored_columns[0][1]
+
+    filtered = [column for column in numeric_columns if not _looks_like_identifier(column) and not _is_metric_noise(column)]
+    return (filtered or numeric_columns)[0] if numeric_columns else None
+
+
+def _metric_score(df: pd.DataFrame, column: str, candidates: list[str], domain: str) -> float:
+    normalized = _normalize_text(column).replace(" ", "_")
+    if _looks_like_identifier(column) or _is_metric_noise(column):
+        return -1000
+
+    score = 0.0
+    for index, candidate in enumerate(candidates):
+        if candidate in normalized:
+            score += max(18, 110 - index * 5)
+    for index, candidate in enumerate(VALUE_CANDIDATES):
+        if candidate in normalized:
+            score += max(10, 70 - index * 3)
+
+    if any(term in normalized for term in NEGATIVE_METRIC_TERMS):
+        score -= 90
+    if domain == "vendas" and any(term in normalized for term in ["compra", "custo", "despesa", "gasto"]):
+        score -= 70
+    if domain == "compras" and any(term in normalized for term in ["receita", "faturamento", "venda"]):
+        score -= 50
+
+    series = pd.to_numeric(df[column], errors="coerce").dropna()
+    if series.empty:
+        return -1000
+    negative_ratio = float((series < 0).sum() / len(series))
+    if negative_ratio > 0 and not any(term in normalized for term in ["lucro", "margem", "saldo"]):
+        score -= 65 * negative_ratio
+
+    return score
 
 
 def _select_group_column(df: pd.DataFrame, normalized_question: str) -> tuple[str | None, str]:
@@ -265,6 +338,17 @@ def _find_column(columns, candidates: list[str]) -> str | None:
             if candidate in normalized:
                 return str(original)
     return None
+
+
+def _looks_like_identifier(column: str) -> bool:
+    normalized = _normalize_text(column).replace(" ", "_")
+    identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
+    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
+
+
+def _is_metric_noise(column: str) -> bool:
+    normalized = _normalize_text(column).replace(" ", "_")
+    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
 
 
 def _quote_identifier(column: str) -> str:

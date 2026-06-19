@@ -8,8 +8,14 @@ from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
 VALUE_CANDIDATES = [
+    "valor_total",
+    "total_venda",
+    "valor_liquido",
+    "valor_bruto",
     "faturamento",
     "receita",
+    "receita_bruta",
+    "receita_liquida",
     "venda",
     "vendas",
     "valor_venda",
@@ -28,6 +34,25 @@ VALUE_CANDIDATES = [
     "lucro",
     "margem",
 ]
+METRIC_NOISE_TERMS = [
+    "id",
+    "codigo",
+    "cod",
+    "nf",
+    "nota_fiscal",
+    "numero",
+    "prazo",
+    "dias",
+    "avaliacao",
+    "rating",
+    "mes",
+    "ano",
+    "trim",
+    "trimestre",
+    "percentual",
+    "taxa",
+]
+NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento"]
 QUANTITY_CANDIDATES = ["quantidade", "qtd", "volume", "unidade", "unidades", "units"]
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 DIMENSION_CANDIDATES = [
@@ -470,13 +495,51 @@ def _select_main_metric(df: pd.DataFrame, numeric_columns: list[str], domain: st
         "clientes": ["valor", "receita", "venda", "compras"],
     }.get(domain, VALUE_CANDIDATES)
 
-    selected = _first_matching(numeric_columns, domain_candidates) or _first_matching(numeric_columns, VALUE_CANDIDATES)
-    if selected:
-        return selected
+    scored_columns = [
+        (_metric_score(df, column, domain, domain_candidates), column)
+        for column in numeric_columns
+    ]
+    scored_columns.sort(reverse=True)
+    if scored_columns and scored_columns[0][0] > 0:
+        return scored_columns[0][1]
 
     non_identifier_columns = [column for column in numeric_columns if not _looks_like_identifier(column)]
-    candidates = non_identifier_columns or numeric_columns
-    return max(candidates, key=lambda column: pd.to_numeric(df[column], errors="coerce").abs().sum(skipna=True))
+    non_noise_columns = [column for column in non_identifier_columns if not _is_metric_noise(column)]
+    candidates = non_noise_columns or non_identifier_columns or numeric_columns
+    return max(candidates, key=lambda column: pd.to_numeric(df[column], errors="coerce").clip(lower=0).sum(skipna=True))
+
+
+def _metric_score(df: pd.DataFrame, column: str, domain: str, domain_candidates: list[str]) -> float:
+    normalized = _normalize_text(column)
+    if _looks_like_identifier(column) or _is_metric_noise(column):
+        return -1000
+
+    score = 0.0
+    for index, candidate in enumerate(domain_candidates):
+        if candidate in normalized:
+            score += max(18, 120 - index * 5)
+    for index, candidate in enumerate(VALUE_CANDIDATES):
+        if candidate in normalized:
+            score += max(10, 80 - index * 3)
+
+    if any(term in normalized for term in NEGATIVE_METRIC_TERMS):
+        score -= 90
+    if domain == "vendas" and any(term in normalized for term in ["compra", "custo", "despesa", "gasto"]):
+        score -= 70
+    if domain == "compras" and any(term in normalized for term in ["receita", "faturamento", "venda"]):
+        score -= 50
+
+    series = pd.to_numeric(df[column], errors="coerce").dropna()
+    if series.empty:
+        return -1000
+
+    negative_ratio = float((series < 0).sum() / len(series))
+    if negative_ratio > 0 and not any(term in normalized for term in ["lucro", "margem", "saldo"]):
+        score -= 65 * negative_ratio
+    if float(series.abs().sum()) == 0:
+        score -= 40
+
+    return score
 
 
 def _select_date_column(df: pd.DataFrame, datetime_columns: list[str], column_names: list[str]) -> str | None:
@@ -532,7 +595,7 @@ def _dashboard_subtitle(
 def _parse_dates(series: pd.Series) -> pd.Series:
     parsed_default = pd.to_datetime(series, errors="coerce")
     parsed_dayfirst = pd.to_datetime(series, errors="coerce", dayfirst=True)
-    return parsed_dayfirst if parsed_dayfirst.notna().sum() >= parsed_default.notna().sum() else parsed_default
+    return parsed_dayfirst if parsed_dayfirst.notna().sum() > parsed_default.notna().sum() else parsed_default
 
 
 def _first_matching(columns: list[str], candidates: list[str]) -> str | None:
@@ -547,6 +610,11 @@ def _looks_like_identifier(column: str) -> bool:
     normalized = _normalize_text(column)
     identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
     return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
+
+
+def _is_metric_noise(column: str) -> bool:
+    normalized = _normalize_text(column)
+    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
 
 
 def _quality_label(score: int) -> str:

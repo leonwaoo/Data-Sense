@@ -875,6 +875,26 @@ h2 {
   padding: 6px 10px;
 }
 
+.date-suggestion-list {
+  background: #f8fafc;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.date-suggestion-list strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.date-suggestion-list p {
+  color: #475569;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
 .chart-box {
   min-height: 240px;
 }

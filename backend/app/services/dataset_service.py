@@ -1,5 +1,6 @@
 import re
 import unicodedata
+import warnings
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -83,14 +84,14 @@ def _read_delimited(content: bytes, extension: str) -> pd.DataFrame:
 
 def _read_excel(content: bytes) -> pd.DataFrame:
     try:
-        sheets = pd.read_excel(BytesIO(content), sheet_name=None)
+        sheets = pd.read_excel(BytesIO(content), sheet_name=None, header=None)
     except ImportError as exc:
         raise ValueError("Nao foi possivel ler Excel. Instale as dependencias openpyxl/xlrd do projeto.") from exc
     except Exception as exc:
         raise ValueError("Nao foi possivel ler o Excel. Verifique se a planilha esta valida.") from exc
 
     for dataframe in sheets.values():
-        cleaned = dataframe.dropna(how="all").dropna(axis=1, how="all")
+        cleaned = _promote_detected_header(dataframe)
         if not cleaned.empty and list(cleaned.columns):
             return cleaned
 
@@ -131,6 +132,68 @@ def _prepare_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
     return dataframe
 
 
+def _promote_detected_header(dataframe: pd.DataFrame) -> pd.DataFrame:
+    dataframe = dataframe.dropna(how="all").dropna(axis=1, how="all")
+    if dataframe.empty:
+        return dataframe
+
+    header_index = _detect_header_row(dataframe)
+    headers = dataframe.iloc[header_index].tolist()
+    body = dataframe.iloc[header_index + 1 :].copy()
+    body.columns = headers
+    return body.dropna(how="all").dropna(axis=1, how="all")
+
+
+def _detect_header_row(dataframe: pd.DataFrame) -> int:
+    sample_size = min(len(dataframe), 12)
+    scored_rows = [(_score_header_row(dataframe, row_index), row_index) for row_index in range(sample_size)]
+    scored_rows.sort(reverse=True)
+    return scored_rows[0][1] if scored_rows else 0
+
+
+def _score_header_row(dataframe: pd.DataFrame, row_index: int) -> float:
+    row = dataframe.iloc[row_index]
+    values = [str(value).strip() for value in row.tolist() if pd.notna(value) and str(value).strip()]
+    if not values:
+        return -100
+
+    non_empty_count = len(values)
+    unique_count = len({_normalize_text(value) for value in values})
+    numeric_count = sum(_looks_like_number(value) for value in values)
+    known_terms = (
+        "data",
+        "mes",
+        "trim",
+        "trimestre",
+        "nf",
+        "nota",
+        "produto",
+        "cliente",
+        "fornecedor",
+        "valor",
+        "receita",
+        "venda",
+        "compra",
+        "prazo",
+        "avaliacao",
+        "status",
+    )
+    known_hits = sum(any(term in _normalize_text(value) for term in known_terms) for value in values)
+    next_row_density = 0
+    if row_index + 1 < len(dataframe):
+        next_row_density = int(dataframe.iloc[row_index + 1].notna().sum())
+
+    score = non_empty_count * 3 + unique_count + known_hits * 4 + min(next_row_density, non_empty_count) * 1.5
+    score -= numeric_count * 2
+
+    if non_empty_count <= 2 and any(len(value) > 28 for value in values):
+        score -= 18
+    if non_empty_count < 2:
+        score -= 12
+
+    return score
+
+
 def _clean_columns(columns) -> list[str]:
     cleaned_columns: list[str] = []
     seen: dict[str, int] = {}
@@ -155,6 +218,10 @@ def _looks_like_identifier(column: str) -> bool:
     normalized = _normalize_text(column)
     identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
     return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
+
+
+def _looks_like_number(value: str) -> bool:
+    return pd.notna(pd.to_numeric(_normalize_number(value), errors="coerce"))
 
 
 def _looks_like_date_column(column: str) -> bool:
@@ -188,11 +255,17 @@ def _looks_like_date_series(series: pd.Series) -> bool:
     if sample.str.contains(r"[/-]").mean() < 0.8:
         return False
 
-    parsed_dates = pd.to_datetime(sample, errors="coerce")
+    parsed_dates = _parse_datetime(sample)
     if parsed_dates.notna().mean() < 0.5:
-        parsed_dates = pd.to_datetime(sample, errors="coerce", dayfirst=True)
+        parsed_dates = _parse_datetime(sample, dayfirst=True)
 
     return parsed_dates.notna().mean() >= 0.8
+
+
+def _parse_datetime(series: pd.Series, dayfirst: bool = False) -> pd.Series:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        return pd.to_datetime(series, errors="coerce", dayfirst=dayfirst)
 
 
 def _maybe_convert_numeric(series: pd.Series) -> pd.Series | None:

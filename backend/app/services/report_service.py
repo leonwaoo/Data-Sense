@@ -15,6 +15,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 from app.models import DatasetSession
+from app.services.dashboard_service import build_dashboard
 from app.services.chart_service import suggest_charts
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
@@ -51,12 +52,14 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = _pdf_header(pdf, context, margin, y, width)
     y = _pdf_kpi_cards(pdf, context, margin, y, width)
     y = _pdf_section(pdf, "Resumo do dataset", _summary_items(context), margin, y, width, height)
+    if context.profile.get("date_conversion_suggestions"):
+        y = _pdf_section(pdf, "Sugestoes de conversao de datas", _date_suggestion_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Qualidade dos dados", _quality_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Principais insights", context.insights, margin, y, width, height)
     y = _pdf_section(pdf, "Recomendacoes", context.recommendations, margin, y, width, height)
 
     for chart in context.charts:
-        needed = 115 * mm
+        needed = 96 * mm
         if y - needed < margin:
             _pdf_footer(pdf, width)
             pdf.showPage()
@@ -87,6 +90,8 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     _png_kpi_cards(draw, context, fonts, x, y)
     y += 150
     y = _png_section(draw, "Resumo do dataset", _summary_items(context), fonts, x, y, max_width)
+    if context.profile.get("date_conversion_suggestions"):
+        y = _png_section(draw, "Sugestoes de conversao de datas", _date_suggestion_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Qualidade dos dados", _quality_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Principais insights", context.insights, fonts, x, y, max_width)
     y = _png_section(draw, "Recomendacoes", context.recommendations, fonts, x, y, max_width)
@@ -125,6 +130,11 @@ def _summary_items(context: ReportContext) -> list[str]:
         f"{len(profile['numeric_columns'])} colunas numericas, {len(profile['categorical_columns'])} categoricas e {len(profile['datetime_columns'])} de data.",
         "Formato aceito e processado com perfil automatico, auditoria de qualidade e sugestoes de graficos.",
     ]
+
+
+def _date_suggestion_items(context: ReportContext) -> list[str]:
+    suggestions = context.profile.get("date_conversion_suggestions", [])
+    return [suggestion["message"] for suggestion in suggestions[:5]]
 
 
 def _quality_items(context: ReportContext) -> list[str]:
@@ -197,6 +207,18 @@ def _build_report_charts(dataset: DatasetSession, profile: dict) -> list[ReportC
             )
         )
 
+    for chart_payload in build_dashboard(dataset).get("charts", []):
+        if chart_payload.get("id") in {"nulos_por_coluna", "score_qualidade"}:
+            continue
+        chart = _chart_from_dashboard_payload(chart_payload)
+        if chart:
+            charts.append(chart)
+        if len(charts) >= 3:
+            break
+
+    if len(charts) >= 3:
+        return charts
+
     for suggestion in suggest_charts(dataset):
         chart = _chart_from_suggestion(dataset, suggestion)
         if chart:
@@ -205,6 +227,33 @@ def _build_report_charts(dataset: DatasetSession, profile: dict) -> list[ReportC
             break
 
     return charts
+
+
+def _chart_from_dashboard_payload(payload: dict) -> ReportChart | None:
+    x_column = payload.get("x")
+    y_column = payload.get("y")
+    data = payload.get("data", [])
+    if not x_column or not y_column or not data:
+        return None
+
+    labels: list[str] = []
+    values: list[float] = []
+    for row in data[:8]:
+        if x_column not in row or y_column not in row:
+            continue
+        labels.append(str(row[x_column]))
+        values.append(float(row[y_column] or 0))
+
+    if not labels:
+        return None
+
+    return ReportChart(
+        title=str(payload.get("title") or "Grafico automatico"),
+        chart_type="line" if payload.get("type") == "line" else "bar",
+        labels=labels,
+        values=values,
+        note=str(payload.get("insight") or payload.get("subtitle") or "Grafico gerado automaticamente pelo DataSense."),
+    )
 
 
 def _chart_from_suggestion(dataset: DatasetSession, suggestion: dict) -> ReportChart | None:
@@ -326,24 +375,31 @@ def _pdf_section(pdf: canvas.Canvas, title: str, items: list[str], margin: float
 
 
 def _pdf_chart(pdf: canvas.Canvas, chart: ReportChart, margin: float, y: float, width: float) -> float:
+    chart_w = width - 2 * margin
+    chart_h = 48 * mm
+    box_h = chart_h + 28 * mm
+
+    pdf.setFillColor(colors.HexColor("#ffffff"))
+    pdf.setStrokeColor(colors.HexColor("#dbe5ef"))
+    pdf.roundRect(margin, y - box_h, chart_w, box_h, 7, fill=1, stroke=1)
+
     pdf.setFillColor(colors.HexColor("#0f172a"))
     pdf.setFont("Helvetica-Bold", 13)
-    pdf.drawString(margin, y, chart.title)
+    pdf.drawString(margin + 10, y - 16, chart.title)
     pdf.setFont("Helvetica", 8.5)
     pdf.setFillColor(colors.HexColor("#64748b"))
-    pdf.drawString(margin, y - 13, chart.note)
+    pdf.drawString(margin + 10, y - 29, _truncate(chart.note, 104))
 
-    chart_x = margin
-    chart_y = y - 102
-    chart_w = width - 2 * margin
-    chart_h = 74
-    _pdf_draw_axes(pdf, chart_x, chart_y, chart_w, chart_h)
+    chart_x = margin + 16
+    chart_y = y - box_h + 20
+    inner_w = chart_w - 32
+    _pdf_draw_axes(pdf, chart_x, chart_y, inner_w, chart_h)
 
     if chart.chart_type == "line":
-        _pdf_line_chart(pdf, chart, chart_x, chart_y, chart_w, chart_h)
+        _pdf_line_chart(pdf, chart, chart_x, chart_y, inner_w, chart_h)
     else:
-        _pdf_bar_chart(pdf, chart, chart_x, chart_y, chart_w, chart_h)
-    return y - 122
+        _pdf_bar_chart(pdf, chart, chart_x, chart_y, inner_w, chart_h)
+    return y - box_h - 14
 
 
 def _pdf_draw_axes(pdf: canvas.Canvas, x: float, y: float, width: float, height: float) -> None:
@@ -353,29 +409,43 @@ def _pdf_draw_axes(pdf: canvas.Canvas, x: float, y: float, width: float, height:
 
 
 def _pdf_bar_chart(pdf: canvas.Canvas, chart: ReportChart, x: float, y: float, width: float, height: float) -> None:
-    max_value = max(chart.values) if chart.values else 1
-    max_value = max(max_value, 1)
+    values = _safe_chart_values(chart.values)
+    if not values or max(abs(value) for value in values) == 0:
+        _pdf_empty_chart_message(pdf, x, y, width, height)
+        return
+
+    min_value = min(min(values), 0)
+    max_value = max(max(values), 0)
+    span = max(max_value - min_value, 1)
+    baseline = y + ((0 - min_value) / span) * (height - 22)
     gap = 7
-    bar_width = (width - gap * (len(chart.values) + 1)) / max(len(chart.values), 1)
+    bar_width = (width - gap * (len(values) + 1)) / max(len(values), 1)
     pdf.setFillColor(colors.HexColor("#0f766e"))
-    for index, value in enumerate(chart.values):
-        bar_height = (value / max_value) * (height - 18)
+    for index, value in enumerate(values):
+        value_y = y + ((value - min_value) / span) * (height - 22)
+        bar_bottom = min(baseline, value_y)
+        bar_height = max(abs(value_y - baseline), 1.5)
         bx = x + gap + index * (bar_width + gap)
-        pdf.rect(bx, y, bar_width, bar_height, fill=1, stroke=0)
+        pdf.rect(bx, bar_bottom, bar_width, bar_height, fill=1, stroke=0)
         pdf.setFillColor(colors.HexColor("#334155"))
         pdf.setFont("Helvetica", 7)
         pdf.drawCentredString(bx + bar_width / 2, y - 10, _truncate(chart.labels[index], 14))
-        pdf.drawCentredString(bx + bar_width / 2, y + bar_height + 4, _format_number(value))
+        pdf.drawCentredString(bx + bar_width / 2, max(baseline, value_y) + 4, _format_number(value))
         pdf.setFillColor(colors.HexColor("#0f766e"))
 
 
 def _pdf_line_chart(pdf: canvas.Canvas, chart: ReportChart, x: float, y: float, width: float, height: float) -> None:
-    max_value = max(chart.values) if chart.values else 1
-    min_value = min(chart.values) if chart.values else 0
+    values = _safe_chart_values(chart.values)
+    if not values or max(abs(value) for value in values) == 0:
+        _pdf_empty_chart_message(pdf, x, y, width, height)
+        return
+
+    max_value = max(values)
+    min_value = min(values)
     span = max(max_value - min_value, 1)
     points = []
-    for index, value in enumerate(chart.values):
-        px = x + (index / max(len(chart.values) - 1, 1)) * width
+    for index, value in enumerate(values):
+        px = x + (index / max(len(values) - 1, 1)) * width
         py = y + ((value - min_value) / span) * (height - 18) + 6
         points.append((px, py))
 
@@ -390,6 +460,12 @@ def _pdf_line_chart(pdf: canvas.Canvas, chart: ReportChart, x: float, y: float, 
         pdf.setFont("Helvetica", 7)
         pdf.drawCentredString(px, y - 10, _truncate(chart.labels[index], 12))
         pdf.setFillColor(colors.HexColor("#0f766e"))
+
+
+def _pdf_empty_chart_message(pdf: canvas.Canvas, x: float, y: float, width: float, height: float) -> None:
+    pdf.setFillColor(colors.HexColor("#64748b"))
+    pdf.setFont("Helvetica", 9)
+    pdf.drawCentredString(x + width / 2, y + height / 2, "Sem valores suficientes para desenhar este grafico.")
 
 
 def _pdf_footer(pdf: canvas.Canvas, width: float) -> None:
@@ -416,11 +492,12 @@ def _png_kpi_cards(draw: ImageDraw.ImageDraw, context: ReportContext, fonts: dic
 
 
 def _png_section(draw: ImageDraw.ImageDraw, title: str, items: list[str], fonts: dict, x: int, y: int, max_width: int) -> int:
-    draw.rounded_rectangle((x, y, x + max_width, y + 60 + len(items) * 34), radius=10, fill="#ffffff", outline="#dbe5ef")
+    wrapped_items = [_wrap_for_pixels(item, fonts["body"], 1120) for item in items]
+    section_height = 62 + sum(max(1, len(lines)) * 28 + 8 for lines in wrapped_items)
+    draw.rounded_rectangle((x, y, x + max_width, y + section_height), radius=10, fill="#ffffff", outline="#dbe5ef")
     draw.text((x + 24, y + 18), title, fill="#0f172a", font=fonts["section"])
     y += 56
-    for item in items:
-        lines = _wrap_for_pixels(item, fonts["body"], 1120)
+    for lines in wrapped_items:
         draw.text((x + 30, y), "-", fill="#0f766e", font=fonts["body_bold"])
         for line in lines:
             draw.text((x + 54, y), line, fill="#334155", font=fonts["body"])
@@ -451,26 +528,41 @@ def _png_axes(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) -> None
 
 def _png_bar_chart(draw: ImageDraw.ImageDraw, chart: ReportChart, box: tuple[int, int, int, int], fonts: dict) -> None:
     left, top, right, bottom = box
-    max_value = max(max(chart.values), 1) if chart.values else 1
+    values = _safe_chart_values(chart.values)
+    if not values or max(abs(value) for value in values) == 0:
+        draw.text((left + 24, top + 54), "Sem valores suficientes para desenhar este grafico.", fill="#64748b", font=fonts["body"])
+        return
+
+    min_value = min(min(values), 0)
+    max_value = max(max(values), 0)
+    span = max(max_value - min_value, 1)
+    baseline = int(bottom - ((0 - min_value) / span) * (bottom - top - 30))
     gap = 22
-    bar_width = max(24, (right - left - gap * (len(chart.values) + 1)) // max(len(chart.values), 1))
-    for index, value in enumerate(chart.values):
-        bar_height = int((value / max_value) * (bottom - top - 30))
+    bar_width = max(24, (right - left - gap * (len(values) + 1)) // max(len(values), 1))
+    for index, value in enumerate(values):
+        value_y = int(bottom - ((value - min_value) / span) * (bottom - top - 30))
+        bar_top = min(baseline, value_y)
+        bar_bottom = max(baseline, value_y)
         bx = left + gap + index * (bar_width + gap)
-        draw.rounded_rectangle((bx, bottom - bar_height, bx + bar_width, bottom), radius=5, fill="#0f766e")
+        draw.rounded_rectangle((bx, bar_top, bx + bar_width, max(bar_bottom, bar_top + 2)), radius=5, fill="#0f766e")
         label = _truncate(chart.labels[index], 16)
         draw.text((bx, bottom + 10), label, fill="#334155", font=fonts["tiny"])
-        draw.text((bx, bottom - bar_height - 22), _format_number(value), fill="#0f172a", font=fonts["tiny"])
+        draw.text((bx, bar_top - 22), _format_number(value), fill="#0f172a", font=fonts["tiny"])
 
 
 def _png_line_chart(draw: ImageDraw.ImageDraw, chart: ReportChart, box: tuple[int, int, int, int], fonts: dict) -> None:
     left, top, right, bottom = box
-    max_value = max(chart.values) if chart.values else 1
-    min_value = min(chart.values) if chart.values else 0
+    values = _safe_chart_values(chart.values)
+    if not values or max(abs(value) for value in values) == 0:
+        draw.text((left + 24, top + 54), "Sem valores suficientes para desenhar este grafico.", fill="#64748b", font=fonts["body"])
+        return
+
+    max_value = max(values)
+    min_value = min(values)
     span = max(max_value - min_value, 1)
     points = []
-    for index, value in enumerate(chart.values):
-        px = int(left + (index / max(len(chart.values) - 1, 1)) * (right - left))
+    for index, value in enumerate(values):
+        px = int(left + (index / max(len(values) - 1, 1)) * (right - left))
         py = int(bottom - ((value - min_value) / span) * (bottom - top - 28) - 10)
         points.append((px, py))
     if len(points) > 1:
@@ -525,6 +617,10 @@ def _wrap_for_pixels(text: str, font: ImageFont.ImageFont, max_width: int) -> li
     if line:
         lines.append(line)
     return lines or [text]
+
+
+def _safe_chart_values(values: list[float]) -> list[float]:
+    return [float(value) for value in values if pd.notna(value)]
 
 
 def _format_number(value: float) -> str:

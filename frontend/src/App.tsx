@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.PROD ? "https://data-sense-api.onrender.com" : "http://127.0.0.1:8000");
 
 type Profile = {
   dataset_id: string;
@@ -155,7 +157,7 @@ export function App() {
           <div className="brand-row">
             <img alt="" className="brand-mark" src="/brand-mark.svg" />
             <div>
-              <p className="eyebrow">DataSense Copilot</p>
+              <p className="eyebrow">DataSense</p>
               <strong>Analise assistida para CSVs</strong>
             </div>
           </div>
@@ -185,7 +187,7 @@ export function App() {
           <Sparkles size={18} />
           <span>{dataset ? "Dataset carregado e pronto para analise" : "Use o arquivo data/sample/vendas_demo.csv para testar o MVP"}</span>
         </div>
-        <strong>{dataset ? `${dataset.profile.datetime_columns.length} data(s), ${dataset.profile.numeric_columns.length} metrica(s)` : "DataSense Copilot"}</strong>
+        <strong>{dataset ? `${dataset.profile.datetime_columns.length} data(s), ${dataset.profile.numeric_columns.length} metrica(s)` : "DataSense"}</strong>
       </section>
 
       <section className="workspace-grid">

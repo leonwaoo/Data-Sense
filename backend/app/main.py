@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,18 +10,32 @@ from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
 app = FastAPI(
-    title="DataSense Copilot API",
+    title="DataSense API",
     description="API para upload, perfil, qualidade e perguntas analiticas sobre CSVs.",
     version="0.1.0",
 )
 
+DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", r"https://.*\.vercel\.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=DEFAULT_CORS_ORIGINS + cors_origins,
+    allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"name": "DataSense API", "health": "/health", "docs": "/docs"}
 
 
 @app.get("/health")

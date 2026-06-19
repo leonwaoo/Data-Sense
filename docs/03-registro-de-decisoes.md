@@ -6,7 +6,7 @@ Este arquivo registra decisoes importantes do projeto para manter a evolucao doc
 
 Data: 2026-06-18.
 
-Decisao: o projeto principal sera o DataSense Copilot.
+Decisao: o projeto principal sera o DataSense.
 
 Motivo: e o projeto com maior impacto para portfolio porque combina analise de dados, IA, visualizacao, qualidade de dados, Python, SQL e UX em uma experiencia unica.
 
@@ -14,7 +14,7 @@ Motivo: e o projeto com maior impacto para portfolio porque combina analise de d
 
 Data: 2026-06-18.
 
-Decisao: o Auditor de Qualidade de Dados sera incluido como modulo do DataSense Copilot, nao como projeto separado no primeiro momento.
+Decisao: o Auditor de Qualidade de Dados sera incluido como modulo do DataSense, nao como projeto separado no primeiro momento.
 
 Motivo: a auditoria aumenta o valor pratico do produto e demonstra maturidade analitica, mas manter tudo em um produto evita dispersao de escopo.
 
@@ -70,6 +70,6 @@ Motivo: o dataset permite demonstrar upload, perfil, auditoria de qualidade, per
 
 Data: 2026-06-18.
 
-Decisao: o nome publico do produto sera DataSense Copilot, com logo propria em SVG no frontend.
+Decisao: o nome publico do produto sera DataSense, com logo propria em SVG no frontend.
 
-Motivo: o nome comunica analise de dados com mais personalidade para portfolio, sem perder a ideia de assistente analitico para CSVs.
+Motivo: o nome comunica analise de dados com mais personalidade para portfolio, sem depender de um termo generico de assistente.

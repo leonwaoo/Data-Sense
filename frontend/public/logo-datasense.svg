@@ -6,9 +6,7 @@
   <path d="M59 104H87" stroke="#2563EB" stroke-width="8" stroke-linecap="round"/>
   <path d="M65 134C80 111 97 118 111 96C122 79 135 72 151 61" stroke="#22C55E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="151" cy="61" r="11" fill="#22C55E"/>
-  <path d="M135 126H150C159.389 126 167 133.611 167 143V147C167 156.389 159.389 164 150 164H122L103 177V164H99C89.6112 164 82 156.389 82 147V143C82 133.611 89.6112 126 99 126H111" fill="#2563EB"/>
-  <circle cx="112" cy="145" r="5" fill="#FFFFFF"/>
-  <circle cx="127" cy="145" r="5" fill="#FFFFFF"/>
-  <circle cx="142" cy="145" r="5" fill="#FFFFFF"/>
+  <rect x="104" y="126" width="14" height="30" rx="4" fill="#2563EB"/>
+  <rect x="126" y="110" width="14" height="46" rx="4" fill="#14B8A6"/>
+  <rect x="148" y="92" width="14" height="64" rx="4" fill="#22C55E"/>
 </svg>
-

@@ -1,8 +1,8 @@
-# DataSense Copilot
+# DataSense
 
 Projeto de portfolio em Data Science e Gestao da Informacao.
 
-O DataSense Copilot e uma aplicacao onde o usuario faz upload de um arquivo CSV e conversa com os dados em linguagem natural. A ferramenta gera respostas analiticas, graficos, insights, auditoria de qualidade dos dados e recomendacoes praticas.
+O DataSense e uma aplicacao onde o usuario faz upload de um arquivo CSV e conversa com os dados em linguagem natural. A ferramenta gera respostas analiticas, graficos, insights, auditoria de qualidade dos dados e recomendacoes praticas.
 
 ## Objetivo
 
@@ -22,7 +22,7 @@ Muitas pessoas e empresas possuem dados em planilhas, mas nao sabem transformar 
 
 ## Solucao
 
-O sistema atuara como um copilot para analise de dados:
+O sistema atuara como um assistente para analise de dados:
 
 - Le o CSV enviado pelo usuario.
 - Identifica colunas, tipos de dados, valores ausentes e possiveis problemas.
@@ -90,12 +90,34 @@ O frontend ficara disponivel em:
 
 - `http://localhost:5173`
 
+Para apontar o frontend para uma API publicada, crie `frontend/.env` com:
+
+```bash
+VITE_API_BASE_URL=https://sua-api.onrender.com
+```
+
 ### Identidade visual
 
-O projeto usa o nome DataSense Copilot e possui logo em SVG nos arquivos:
+O projeto usa o nome DataSense e possui logo em SVG nos arquivos:
 
 - `frontend/public/brand-mark.svg`
 - `frontend/public/logo-datasense.svg`
+
+## Deploy
+
+### Backend no Render
+
+O arquivo `render.yaml` define a API como um Web Service Python:
+
+- Build: `pip install -r requirements.txt`
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Health check: `/health`
+
+### Frontend na Vercel
+
+Configure a Vercel com root directory `frontend` e defina a variavel:
+
+- `VITE_API_BASE_URL`: URL publica da API no Render
 
 ### Dataset demonstrativo
 

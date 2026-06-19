@@ -1,8 +1,8 @@
-# Definicao do Projeto: DataSense Copilot
+# Definicao do Projeto: DataSense
 
 ## 1. Visao geral
 
-O DataSense Copilot sera uma aplicacao web de analise automatizada de dados. O usuario envia um arquivo CSV e interage com os dados por meio de perguntas em linguagem natural, como:
+O DataSense sera uma aplicacao web de analise automatizada de dados. O usuario envia um arquivo CSV e interage com os dados por meio de perguntas em linguagem natural, como:
 
 - Qual produto mais vendeu?
 - Quais meses tiveram maior faturamento?
@@ -27,7 +27,7 @@ Para recrutadores, o projeto demonstra capacidade de criar uma solucao completa,
 
 ## 4. Escopo principal
 
-O projeto principal sera o DataSense Copilot.
+O projeto principal sera o DataSense.
 
 O Auditor de Qualidade de Dados entrara como modulo interno do produto, porque aumenta o valor do projeto sem desviar da ideia central.
 
@@ -193,13 +193,13 @@ O projeto sera considerado bem-sucedido quando:
 
 ## 12. Nome do projeto
 
-Nome principal: DataSense Copilot.
+Nome principal: DataSense.
 
 Possiveis nomes alternativos para branding:
 
-- Insight Copilot.
-- CSV Copilot.
-- Data Analyst Copilot.
+- Insight Data.
+- CSV Sense.
+- Data Analyst.
 - AnalystAI.
 
-Decisao atual: adotar DataSense Copilot por soar mais memoravel como produto, mantendo clareza para entrevistas e portfolio.
+Decisao atual: adotar DataSense por soar mais memoravel como produto, mantendo clareza para entrevistas e portfolio.

@@ -2,7 +2,7 @@
 
 ## 1. Objetivo tecnico
 
-Construir a primeira versao funcional do DataSense Copilot com foco em uma experiencia demonstravel:
+Construir a primeira versao funcional do DataSense com foco em uma experiencia demonstravel:
 
 1. Usuario envia um arquivo CSV.
 2. Sistema valida e interpreta o dataset.

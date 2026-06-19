@@ -100,6 +100,11 @@ def dataset_dashboard(dataset_id: str) -> dict:
     return build_dashboard(get_dataset(dataset_id))
 
 
+@app.post("/datasets/{dataset_id}/dashboard")
+def dataset_dashboard_filtered(dataset_id: str, payload: dict) -> dict:
+    return build_dashboard(get_dataset(dataset_id), filters=payload)
+
+
 @app.get("/datasets/{dataset_id}/report.pdf")
 def dataset_report_pdf(dataset_id: str) -> Response:
     dataset = get_dataset(dataset_id)

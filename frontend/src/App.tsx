@@ -1,19 +1,46 @@
 import {
+  ArrowDown,
+  ArrowUp,
   BarChart3,
+  Clock,
   Database,
   Download,
+  Eye,
+  EyeOff,
+  FileImage,
   FileQuestion,
   FileSpreadsheet,
+  Filter,
+  ImagePlus,
   LayoutDashboard,
   Lightbulb,
+  Palette,
+  Printer,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   TrendingUp,
   UploadCloud,
+  X,
 } from "lucide-react";
-import type { DragEvent, ReactNode } from "react";
+import type { CSSProperties, DragEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
@@ -102,6 +129,7 @@ type DashboardPayload = {
   kpis: DashboardKpi[];
   charts: DashboardChart[];
   insights: string[];
+  filters: DashboardFilterControls;
   quality: {
     score: number;
     missing_total: number;
@@ -109,6 +137,80 @@ type DashboardPayload = {
     empty_columns: string[];
   };
 };
+
+type DashboardFilters = {
+  date_from?: string;
+  date_to?: string;
+  categories: Record<string, string[]>;
+};
+
+type DashboardFilterControls = {
+  date: {
+    column: string;
+    min: string;
+    max: string;
+    selected_from: string | null;
+    selected_to: string | null;
+  } | null;
+  categories: {
+    label: string;
+    column: string;
+    values: { value: string; count: number }[];
+    selected: string[];
+  }[];
+  applied_count: number;
+  rows_before_filter: number;
+  rows_after_filter: number;
+};
+
+type DashboardTheme = "teal" | "blue" | "violet" | "graphite";
+
+type DashboardSettings = {
+  title: string;
+  theme: DashboardTheme;
+  logoDataUrl: string | null;
+};
+
+type HistoryItem = {
+  datasetId: string;
+  fileName: string;
+  rows: number;
+  columns: number;
+  qualityScore: number;
+  domainLabel: string;
+  createdAt: string;
+};
+
+const HISTORY_STORAGE_KEY = "datasense-dashboard-history-v1";
+
+const dashboardThemeMap: Record<DashboardTheme, { label: string; accent: string; soft: string; series: string[] }> = {
+  teal: {
+    label: "Verde",
+    accent: "#0f766e",
+    soft: "#ecfdf5",
+    series: ["#0f766e", "#2563eb", "#d97706", "#7c3aed", "#be123c", "#15803d"],
+  },
+  blue: {
+    label: "Azul",
+    accent: "#2563eb",
+    soft: "#eff6ff",
+    series: ["#2563eb", "#0f766e", "#dc2626", "#9333ea", "#ca8a04", "#0891b2"],
+  },
+  violet: {
+    label: "Violeta",
+    accent: "#7c3aed",
+    soft: "#f5f3ff",
+    series: ["#7c3aed", "#0f766e", "#2563eb", "#d97706", "#be123c", "#15803d"],
+  },
+  graphite: {
+    label: "Grafite",
+    accent: "#334155",
+    soft: "#f8fafc",
+    series: ["#334155", "#0f766e", "#2563eb", "#d97706", "#7c3aed", "#be123c"],
+  },
+};
+
+const defaultDashboardFilters: DashboardFilters = { categories: {} };
 
 const suggestedQuestions = [
   "Quantas linhas e colunas existem?",
@@ -132,6 +234,13 @@ const sampleFiles = [
 export function App() {
   const [dataset, setDataset] = useState<UploadResponse | null>(null);
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
+  const [dashboardFilters, setDashboardFilters] = useState<DashboardFilters>(defaultDashboardFilters);
+  const [dashboardSettings, setDashboardSettings] = useState<DashboardSettings>({
+    title: "Dashboard DataSense",
+    theme: "teal",
+    logoDataUrl: null,
+  });
+  const [history, setHistory] = useState<HistoryItem[]>(loadHistory);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [chartSuggestions, setChartSuggestions] = useState<ChartSuggestion[]>([]);
@@ -164,6 +273,7 @@ export function App() {
     setAnswer(null);
     setDashboard(null);
     setChartSuggestions([]);
+    setDashboardFilters(defaultDashboardFilters);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -181,6 +291,10 @@ export function App() {
 
       const uploadPayload: UploadResponse = await response.json();
       setDataset(uploadPayload);
+      setDashboardSettings((current) => ({
+        ...current,
+        title: `Dashboard - ${uploadPayload.file_name.replace(/\.[^.]+$/, "")}`,
+      }));
       setIsDashboardLoading(true);
       const [suggestions, dashboardPayload] = await Promise.all([
         fetchChartSuggestions(uploadPayload.dataset_id).catch(() => []),
@@ -188,6 +302,9 @@ export function App() {
       ]);
       setChartSuggestions(suggestions);
       setDashboard(dashboardPayload);
+      if (dashboardPayload) {
+        setHistory(saveHistory(uploadPayload, dashboardPayload));
+      }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Erro inesperado no upload.");
     } finally {
@@ -240,11 +357,42 @@ export function App() {
     return (await response.json()) as ChartSuggestion[];
   }
 
-  async function fetchDashboard(datasetId: string) {
-    const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/dashboard`);
+  async function fetchDashboard(datasetId: string, filters?: DashboardFilters) {
+    const hasFilters = !!filters && hasActiveFilters(filters);
+    const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/dashboard`, {
+      method: hasFilters ? "POST" : "GET",
+      headers: hasFilters ? { "Content-Type": "application/json" } : undefined,
+      body: hasFilters ? JSON.stringify(filters) : undefined,
+    });
 
     if (!response.ok) return null;
     return (await response.json()) as DashboardPayload;
+  }
+
+  async function handleApplyDashboardFilters(filters: DashboardFilters) {
+    if (!dataset) return;
+
+    setDashboardFilters(filters);
+    setIsDashboardLoading(true);
+    setError(null);
+
+    try {
+      const filteredDashboard = await fetchDashboard(dataset.dataset_id, filters);
+      setDashboard(filteredDashboard);
+    } catch (filterError) {
+      setError(filterError instanceof Error ? filterError.message : "Erro inesperado ao filtrar dashboard.");
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }
+
+  function handleResetDashboardFilters() {
+    void handleApplyDashboardFilters(defaultDashboardFilters);
+  }
+
+  function handleClearHistory() {
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+    setHistory([]);
   }
 
   async function handleAsk(nextQuestion = question) {
@@ -377,6 +525,8 @@ export function App() {
         </nav>
       </section>
 
+      <HistoryPanel history={history} onClear={handleClearHistory} />
+
       {dataset ? (
         <section className="report-strip">
           <div>
@@ -397,7 +547,17 @@ export function App() {
         </section>
       ) : null}
 
-      {dataset ? <DashboardSection dashboard={dashboard} isLoading={isDashboardLoading} /> : null}
+      {dataset ? (
+        <DashboardSection
+          dashboard={dashboard}
+          filters={dashboardFilters}
+          isLoading={isDashboardLoading}
+          settings={dashboardSettings}
+          onApplyFilters={(filters) => void handleApplyDashboardFilters(filters)}
+          onResetFilters={handleResetDashboardFilters}
+          onSettingsChange={setDashboardSettings}
+        />
+      ) : null}
 
       <section className="workspace-grid">
         <div className="panel">
@@ -525,8 +685,115 @@ function EmptyState({ text }: { text: string }) {
   return <div className="empty-state">{text}</div>;
 }
 
-function DashboardSection({ dashboard, isLoading }: { dashboard: DashboardPayload | null; isLoading: boolean }) {
+function HistoryPanel({ history, onClear }: { history: HistoryItem[]; onClear: () => void }) {
+  if (!history.length) return null;
+
+  return (
+    <section className="history-strip">
+      <div>
+        <Clock size={18} />
+        <strong>Historico local</strong>
+      </div>
+      <div className="history-list">
+        {history.slice(0, 4).map((item) => (
+          <article key={`${item.datasetId}-${item.createdAt}`}>
+            <span>{item.fileName}</span>
+            <small>
+              {item.rows.toLocaleString("pt-BR")} linhas - qualidade {item.qualityScore}/100 - {item.domainLabel}
+            </small>
+          </article>
+        ))}
+      </div>
+      <button aria-label="Limpar historico" onClick={onClear} type="button">
+        <X size={16} />
+      </button>
+    </section>
+  );
+}
+
+function DashboardSection({
+  dashboard,
+  filters,
+  isLoading,
+  settings,
+  onApplyFilters,
+  onResetFilters,
+  onSettingsChange,
+}: {
+  dashboard: DashboardPayload | null;
+  filters: DashboardFilters;
+  isLoading: boolean;
+  settings: DashboardSettings;
+  onApplyFilters: (filters: DashboardFilters) => void;
+  onResetFilters: () => void;
+  onSettingsChange: (settings: DashboardSettings | ((current: DashboardSettings) => DashboardSettings)) => void;
+}) {
   const [chartTypes, setChartTypes] = useState<Record<string, string>>({});
+  const [chartOrder, setChartOrder] = useState<string[]>([]);
+  const [hiddenCharts, setHiddenCharts] = useState<Set<string>>(new Set());
+  const [isExportingDashboard, setIsExportingDashboard] = useState<"png" | null>(null);
+  const theme = dashboardThemeMap[settings.theme] ?? dashboardThemeMap.teal;
+  const chartIds = useMemo(() => dashboard?.charts.map((chart) => chart.id).join("|") ?? "", [dashboard]);
+
+  useEffect(() => {
+    if (!dashboard) return;
+    setChartOrder(dashboard.charts.map((chart) => chart.id));
+    setHiddenCharts(new Set());
+  }, [chartIds, dashboard]);
+
+  const orderedCharts = useMemo(() => {
+    if (!dashboard) return [];
+    const byId = new Map(dashboard.charts.map((chart) => [chart.id, chart]));
+    const ordered = chartOrder.map((id) => byId.get(id)).filter((chart): chart is DashboardChart => !!chart);
+    const missing = dashboard.charts.filter((chart) => !chartOrder.includes(chart.id));
+    return [...ordered, ...missing].filter((chart) => !hiddenCharts.has(chart.id));
+  }, [chartOrder, dashboard, hiddenCharts]);
+
+  function moveChart(chartId: string, direction: -1 | 1) {
+    setChartOrder((current) => {
+      const next = current.length ? [...current] : dashboard?.charts.map((chart) => chart.id) ?? [];
+      const index = next.indexOf(chartId);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function hideChart(chartId: string) {
+    setHiddenCharts((current) => new Set(current).add(chartId));
+  }
+
+  function showChart(chartId: string) {
+    setHiddenCharts((current) => {
+      const next = new Set(current);
+      next.delete(chartId);
+      return next;
+    });
+  }
+
+  function handlePrintDashboard() {
+    document.body.classList.add("printing-dashboard");
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(() => document.body.classList.remove("printing-dashboard"), 300);
+    }, 50);
+  }
+
+  async function handleExportDashboardPng() {
+    if (!dashboard) return;
+    setIsExportingDashboard("png");
+    try {
+      await exportDashboardAsPng(
+        dashboard,
+        settings,
+        orderedCharts.map((chart) => ({ ...chart, type: chartTypes[chart.id] ?? chart.type })),
+        theme,
+      );
+    } finally {
+      setIsExportingDashboard(null);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -543,18 +810,46 @@ function DashboardSection({ dashboard, isLoading }: { dashboard: DashboardPayloa
   if (!dashboard) return null;
 
   return (
-    <section className="panel dashboard-panel">
+    <section
+      className={`panel dashboard-panel dashboard-theme-${settings.theme} dashboard-export-target`}
+      style={
+        {
+          "--dashboard-accent": theme.accent,
+          "--dashboard-soft": theme.soft,
+        } as CSSProperties
+      }
+    >
       <div className="dashboard-heading">
         <div>
-          <LayoutDashboard size={22} />
+          {settings.logoDataUrl ? <img alt="" className="dashboard-logo" src={settings.logoDataUrl} /> : <LayoutDashboard size={22} />}
           <div>
-            <h2>{dashboard.title}</h2>
+            <h2>{settings.title || dashboard.title}</h2>
             <span>{dashboard.subtitle}</span>
           </div>
         </div>
         <span className="domain-pill">
           {dashboard.domain.label} - {Math.round(dashboard.domain.confidence * 100)}%
         </span>
+      </div>
+
+      <div className="dashboard-toolbox no-print">
+        <DashboardCustomization settings={settings} onSettingsChange={onSettingsChange} />
+        <DashboardFiltersPanel
+          controls={dashboard.filters}
+          filters={filters}
+          onApply={onApplyFilters}
+          onReset={onResetFilters}
+        />
+        <div className="dashboard-export-actions">
+          <button onClick={handlePrintDashboard} type="button">
+            <Printer size={16} />
+            Exportar PDF
+          </button>
+          <button disabled={!!isExportingDashboard} onClick={() => void handleExportDashboardPng()} type="button">
+            <FileImage size={16} />
+            {isExportingDashboard ? "Gerando PNG..." : "Exportar PNG"}
+          </button>
+        </div>
       </div>
 
       <div className="dashboard-kpis">
@@ -564,7 +859,7 @@ function DashboardSection({ dashboard, isLoading }: { dashboard: DashboardPayloa
       </div>
 
       <div className="dashboard-chart-grid">
-        {dashboard.charts.map((chart) => {
+        {orderedCharts.map((chart) => {
           const selectedType = chartTypes[chart.id] ?? chart.type;
           return (
             <article className="dashboard-chart-card" key={chart.id}>
@@ -573,18 +868,42 @@ function DashboardSection({ dashboard, isLoading }: { dashboard: DashboardPayloa
                   <strong>{chart.title}</strong>
                   <span>{chart.subtitle}</span>
                 </div>
-                <ChartTypeControl
-                  activeType={selectedType}
-                  availableTypes={chart.available_types ?? [chart.type]}
-                  onChange={(type) => setChartTypes((current) => ({ ...current, [chart.id]: type }))}
-                />
+                <div className="chart-actions no-print">
+                  <ChartTypeControl
+                    activeType={selectedType}
+                    availableTypes={chart.available_types ?? [chart.type]}
+                    onChange={(type) => setChartTypes((current) => ({ ...current, [chart.id]: type }))}
+                  />
+                  <button aria-label="Mover grafico para cima" onClick={() => moveChart(chart.id, -1)} type="button">
+                    <ArrowUp size={15} />
+                  </button>
+                  <button aria-label="Mover grafico para baixo" onClick={() => moveChart(chart.id, 1)} type="button">
+                    <ArrowDown size={15} />
+                  </button>
+                  <button aria-label="Ocultar grafico" onClick={() => hideChart(chart.id)} type="button">
+                    <EyeOff size={15} />
+                  </button>
+                </div>
               </div>
-              <ChartRenderer chart={{ ...chart, type: selectedType }} height={250} />
+              <ChartRenderer chart={{ ...chart, type: selectedType }} colors={theme.series} height={250} />
               <p>{chart.insight}</p>
             </article>
           );
         })}
       </div>
+
+      {hiddenCharts.size ? (
+        <div className="hidden-chart-list no-print">
+          {dashboard.charts
+            .filter((chart) => hiddenCharts.has(chart.id))
+            .map((chart) => (
+              <button key={chart.id} onClick={() => showChart(chart.id)} type="button">
+                <Eye size={15} />
+                Mostrar {chart.title}
+              </button>
+            ))}
+        </div>
+      ) : null}
 
       {dashboard.insights.length ? (
         <div className="dashboard-insights">
@@ -598,6 +917,174 @@ function DashboardSection({ dashboard, isLoading }: { dashboard: DashboardPayloa
         </div>
       ) : null}
     </section>
+  );
+}
+
+function DashboardCustomization({
+  settings,
+  onSettingsChange,
+}: {
+  settings: DashboardSettings;
+  onSettingsChange: (settings: DashboardSettings | ((current: DashboardSettings) => DashboardSettings)) => void;
+}) {
+  function handleLogoUpload(file: File | null) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      onSettingsChange((current) => ({ ...current, logoDataUrl: String(reader.result || "") }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="toolbox-block">
+      <div className="toolbox-title">
+        <Palette size={17} />
+        <strong>Personalizacao</strong>
+      </div>
+      <label>
+        <span>Titulo</span>
+        <input
+          value={settings.title}
+          onChange={(event) => onSettingsChange((current) => ({ ...current, title: event.target.value }))}
+        />
+      </label>
+      <label>
+        <span>Tema</span>
+        <select
+          value={settings.theme}
+          onChange={(event) =>
+            onSettingsChange((current) => ({ ...current, theme: event.target.value as DashboardTheme }))
+          }
+        >
+          {Object.entries(dashboardThemeMap).map(([key, theme]) => (
+            <option key={key} value={key}>
+              {theme.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="logo-actions">
+        <label className="logo-picker">
+          <ImagePlus size={16} />
+          Logo
+          <input accept="image/*" type="file" onChange={(event) => handleLogoUpload(event.target.files?.[0] ?? null)} />
+        </label>
+        {settings.logoDataUrl ? (
+          <button onClick={() => onSettingsChange((current) => ({ ...current, logoDataUrl: null }))} type="button">
+            <X size={15} />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DashboardFiltersPanel({
+  controls,
+  filters,
+  onApply,
+  onReset,
+}: {
+  controls: DashboardFilterControls;
+  filters: DashboardFilters;
+  onApply: (filters: DashboardFilters) => void;
+  onReset: () => void;
+}) {
+  const [draft, setDraft] = useState<DashboardFilters>(filters);
+
+  useEffect(() => {
+    setDraft(filters);
+  }, [filters, controls.applied_count, controls.rows_after_filter]);
+
+  function toggleCategory(column: string, value: string) {
+    setDraft((current) => {
+      const selected = new Set(current.categories[column] ?? []);
+      if (selected.has(value)) {
+        selected.delete(value);
+      } else {
+        selected.add(value);
+      }
+
+      return {
+        ...current,
+        categories: {
+          ...current.categories,
+          [column]: Array.from(selected),
+        },
+      };
+    });
+  }
+
+  return (
+    <div className="toolbox-block dashboard-filter-block">
+      <div className="toolbox-title">
+        <Filter size={17} />
+        <strong>Filtros</strong>
+        <small>
+          {controls.rows_after_filter.toLocaleString("pt-BR")} / {controls.rows_before_filter.toLocaleString("pt-BR")} linhas
+        </small>
+      </div>
+
+      {controls.date ? (
+        <div className="date-filter-grid">
+          <label>
+            <span>Inicio</span>
+            <input
+              max={controls.date.max}
+              min={controls.date.min}
+              type="date"
+              value={draft.date_from ?? ""}
+              onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value || undefined }))}
+            />
+          </label>
+          <label>
+            <span>Fim</span>
+            <input
+              max={controls.date.max}
+              min={controls.date.min}
+              type="date"
+              value={draft.date_to ?? ""}
+              onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value || undefined }))}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      <div className="filter-groups">
+        {controls.categories.map((category) => (
+          <div className="filter-group" key={category.column}>
+            <strong>{category.column}</strong>
+            <div>
+              {category.values.slice(0, 6).map((item) => {
+                const selected = (draft.categories[category.column] ?? []).includes(item.value);
+                return (
+                  <button
+                    className={selected ? "is-selected" : ""}
+                    key={item.value}
+                    onClick={() => toggleCategory(category.column, item.value)}
+                    type="button"
+                  >
+                    {item.value}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="filter-actions">
+        <button onClick={() => onApply(cleanFilters(draft))} type="button">
+          Aplicar filtros
+        </button>
+        <button onClick={onReset} type="button">
+          <RotateCcw size={15} />
+          Limpar
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -645,10 +1132,24 @@ function AnswerView({ answer }: { answer: Answer }) {
 }
 
 function AnswerChart({ chart }: { chart: ChartPayload }) {
-  return <ChartRenderer chart={chart} height={240} />;
+  return <ChartRenderer chart={chart} colors={dashboardThemeMap.teal.series} height={240} />;
 }
 
-function ChartRenderer({ chart, height }: { chart: ChartPayload; height: number }) {
+function ChartRenderer({ chart, colors, height }: { chart: ChartPayload; colors: string[]; height: number }) {
+  if (chart.type === "area") {
+    return (
+      <ResponsiveContainer height={height} width="100%">
+        <AreaChart data={chart.data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey={chart.x} />
+          <YAxis />
+          <Tooltip />
+          <Area dataKey={chart.y} fill={colors[0]} fillOpacity={0.18} stroke={colors[0]} strokeWidth={3} type="monotone" />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  }
+
   if (chart.type === "line") {
     return (
       <ResponsiveContainer height={height} width="100%">
@@ -657,8 +1158,23 @@ function ChartRenderer({ chart, height }: { chart: ChartPayload; height: number 
           <XAxis dataKey={chart.x} />
           <YAxis />
           <Tooltip />
-          <Line dataKey={chart.y} stroke="#0f766e" strokeWidth={3} type="monotone" />
+          <Line dataKey={chart.y} stroke={colors[0]} strokeWidth={3} type="monotone" />
         </LineChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  if (chart.type === "pie") {
+    return (
+      <ResponsiveContainer height={height} width="100%">
+        <PieChart>
+          <Tooltip />
+          <Pie data={chart.data} dataKey={chart.y} innerRadius={44} nameKey={chart.x} outerRadius={92} paddingAngle={2}>
+            {chart.data.map((_, index) => (
+              <Cell fill={colors[index % colors.length]} key={index} />
+            ))}
+          </Pie>
+        </PieChart>
       </ResponsiveContainer>
     );
   }
@@ -670,10 +1186,295 @@ function ChartRenderer({ chart, height }: { chart: ChartPayload; height: number 
         <XAxis dataKey={chart.x} />
         <YAxis />
         <Tooltip />
-        <Bar dataKey={chart.y} fill="#0f766e" radius={[6, 6, 0, 0]} />
+        <Bar dataKey={chart.y} fill={colors[0]} radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
+}
+
+function hasActiveFilters(filters: DashboardFilters) {
+  return Boolean(
+    filters.date_from ||
+      filters.date_to ||
+      Object.values(filters.categories).some((values) => values.length > 0),
+  );
+}
+
+function cleanFilters(filters: DashboardFilters): DashboardFilters {
+  const categories = Object.fromEntries(
+    Object.entries(filters.categories)
+      .map(([column, values]) => [column, values.filter(Boolean)])
+      .filter(([, values]) => values.length > 0),
+  );
+  return {
+    date_from: filters.date_from || undefined,
+    date_to: filters.date_to || undefined,
+    categories,
+  };
+}
+
+function loadHistory(): HistoryItem[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, 6) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(upload: UploadResponse, dashboard: DashboardPayload) {
+  const nextItem: HistoryItem = {
+    datasetId: upload.dataset_id,
+    fileName: upload.file_name,
+    rows: upload.profile.rows,
+    columns: upload.profile.columns,
+    qualityScore: upload.quality.score,
+    domainLabel: dashboard.domain.label,
+    createdAt: new Date().toISOString(),
+  };
+  const nextHistory = [
+    nextItem,
+    ...loadHistory().filter((item) => item.fileName !== upload.file_name || item.rows !== upload.profile.rows),
+  ].slice(0, 6);
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+  return nextHistory;
+}
+
+async function exportDashboardAsPng(
+  dashboard: DashboardPayload,
+  settings: DashboardSettings,
+  charts: DashboardChart[],
+  theme: { accent: string; soft: string; series: string[] },
+) {
+  const width = 1400;
+  const chartRows = Math.ceil(Math.min(charts.length, 4) / 2);
+  const height = 470 + chartRows * 300 + Math.ceil(dashboard.insights.length / 2) * 54;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  context.fillStyle = "#eef3f8";
+  context.fillRect(0, 0, width, height);
+  drawRoundRect(context, 40, 34, width - 80, height - 68, 22, "#ffffff", "#dbe5ef");
+
+  if (settings.logoDataUrl) {
+    const logo = await loadImage(settings.logoDataUrl).catch(() => null);
+    if (logo) {
+      context.drawImage(logo, 70, 64, 58, 58);
+    }
+  } else {
+    drawRoundRect(context, 70, 64, 58, 58, 14, theme.soft, "#b6d9d3");
+    context.fillStyle = theme.accent;
+    context.font = "700 26px Arial";
+    context.fillText("DS", 82, 101);
+  }
+
+  context.fillStyle = "#0f172a";
+  context.font = "800 34px Arial";
+  context.fillText(settings.title || dashboard.title, 150, 86);
+  context.fillStyle = "#64748b";
+  context.font = "500 18px Arial";
+  drawWrappedText(context, dashboard.subtitle, 150, 116, 980, 24);
+  drawPill(context, dashboard.domain.label, width - 305, 70, 230, theme.accent, theme.soft);
+
+  let x = 70;
+  let y = 170;
+  const kpiWidth = 196;
+  dashboard.kpis.slice(0, 6).forEach((kpi, index) => {
+    const cardX = x + index * (kpiWidth + 14);
+    drawRoundRect(context, cardX, y, kpiWidth, 112, 14, "#f8fafc", "#dbe5ef");
+    context.fillStyle = "#526173";
+    context.font = "700 15px Arial";
+    drawWrappedText(context, kpi.label, cardX + 16, y + 28, kpiWidth - 32, 18);
+    context.fillStyle = "#0f172a";
+    context.font = "800 25px Arial";
+    drawWrappedText(context, kpi.value, cardX + 16, y + 62, kpiWidth - 32, 28);
+    context.fillStyle = "#64748b";
+    context.font = "500 13px Arial";
+    drawWrappedText(context, kpi.detail, cardX + 16, y + 90, kpiWidth - 32, 16);
+  });
+
+  y = 330;
+  charts.slice(0, 4).forEach((chart, index) => {
+    const chartX = 70 + (index % 2) * 630;
+    const chartY = y + Math.floor(index / 2) * 300;
+    drawRoundRect(context, chartX, chartY, 594, 258, 16, "#f8fafc", "#dbe5ef");
+    context.fillStyle = "#0f172a";
+    context.font = "800 19px Arial";
+    context.fillText(chart.title, chartX + 20, chartY + 32);
+    context.fillStyle = "#64748b";
+    context.font = "500 13px Arial";
+    drawWrappedText(context, chart.insight, chartX + 20, chartY + 55, 540, 18);
+    drawCanvasChart(context, chart, chartX + 28, chartY + 92, 536, 130, theme.series);
+  });
+
+  const insightY = y + chartRows * 300 + 8;
+  context.fillStyle = "#0f172a";
+  context.font = "800 21px Arial";
+  context.fillText("Principais leituras", 70, insightY);
+  dashboard.insights.slice(0, 6).forEach((insight, index) => {
+    const chipX = 70 + (index % 2) * 630;
+    const chipY = insightY + 26 + Math.floor(index / 2) * 54;
+    drawRoundRect(context, chipX, chipY, 594, 40, 20, "#ffffff", "#dbe5ef");
+    context.fillStyle = "#334155";
+    context.font = "600 14px Arial";
+    drawWrappedText(context, insight, chipX + 16, chipY + 25, 552, 18);
+  });
+
+  const anchor = document.createElement("a");
+  anchor.download = `${sanitizeFilename(settings.title || dashboard.title)}.png`;
+  anchor.href = canvas.toDataURL("image/png");
+  anchor.click();
+}
+
+function drawCanvasChart(
+  context: CanvasRenderingContext2D,
+  chart: DashboardChart,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  colors: string[],
+) {
+  const data = chart.data.slice(0, 8);
+  const values = data.map((row) => Number(row[chart.y]) || 0);
+  const max = Math.max(...values, 1);
+
+  context.strokeStyle = "#cbd5e1";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(x, y + height);
+  context.lineTo(x + width, y + height);
+  context.stroke();
+
+  if (chart.type === "line" || chart.type === "area") {
+    context.strokeStyle = colors[0];
+    context.fillStyle = `${colors[0]}22`;
+    context.lineWidth = 4;
+    context.beginPath();
+    data.forEach((_, index) => {
+      const pointX = x + (index / Math.max(data.length - 1, 1)) * width;
+      const pointY = y + height - (values[index] / max) * height;
+      if (index === 0) context.moveTo(pointX, pointY);
+      else context.lineTo(pointX, pointY);
+    });
+    context.stroke();
+    return;
+  }
+
+  if (chart.type === "pie") {
+    const total = values.reduce((sum, value) => sum + value, 0) || 1;
+    let start = -Math.PI / 2;
+    values.forEach((value, index) => {
+      const angle = (value / total) * Math.PI * 2;
+      context.fillStyle = colors[index % colors.length];
+      context.beginPath();
+      context.moveTo(x + width / 2, y + height / 2);
+      context.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, start, start + angle);
+      context.closePath();
+      context.fill();
+      start += angle;
+    });
+    return;
+  }
+
+  const barWidth = width / Math.max(data.length, 1) - 8;
+  values.forEach((value, index) => {
+    const barHeight = (value / max) * height;
+    context.fillStyle = colors[index % colors.length];
+    context.fillRect(x + index * (barWidth + 8), y + height - barHeight, Math.max(barWidth, 8), barHeight);
+  });
+}
+
+function drawRoundRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  fill: string,
+  stroke?: string,
+) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
+  context.fillStyle = fill;
+  context.fill();
+  if (stroke) {
+    context.strokeStyle = stroke;
+    context.lineWidth = 1;
+    context.stroke();
+  }
+}
+
+function drawPill(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  accent: string,
+  fill: string,
+) {
+  drawRoundRect(context, x, y, width, 38, 19, fill, "#dbe5ef");
+  context.fillStyle = accent;
+  context.font = "800 15px Arial";
+  context.fillText(text, x + 18, y + 25);
+}
+
+function drawWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+) {
+  const words = String(text).split(" ");
+  let line = "";
+  words.forEach((word) => {
+    const nextLine = line ? `${line} ${word}` : word;
+    if (context.measureText(nextLine).width > maxWidth && line) {
+      context.fillText(line, x, y);
+      y += lineHeight;
+      line = word;
+    } else {
+      line = nextLine;
+    }
+  });
+  if (line) context.fillText(line, x, y);
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+function sanitizeFilename(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
 }
 
 function DataTable({ rows }: { rows: Record<string, CellValue>[] }) {

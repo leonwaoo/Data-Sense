@@ -41,9 +41,13 @@ O sistema atuara como um assistente para analise de dados:
 - Permite perguntas em linguagem natural sobre os dados.
 - Gera consultas, tabelas resumidas, graficos e explicacoes para dados de vendas, compras, clientes, fornecedores, categorias e regioes.
 - Monta um dashboard automatico apos o upload com KPIs, evolucao mensal, rankings, nulos e score de qualidade.
+- Permite personalizar o dashboard com titulo, tema, logo, tipo de grafico, ordem dos graficos e graficos ocultos.
+- Recalcula o dashboard com filtros de periodo e categorias, como produto, fornecedor, cliente, categoria, regiao ou canal.
 - Detecta anomalias e problemas de qualidade.
 - Sugere proximas analises e recomendacoes de negocio.
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
+- Exporta o dashboard personalizado em PDF via impressao e PNG gerado no navegador.
+- Mantem historico local das ultimas analises carregadas.
 
 ## Documentacao
 
@@ -176,6 +180,6 @@ Perguntas uteis para teste:
 
 ## Status
 
-Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, dashboard automatico, auditoria de qualidade, chat analitico e sugestoes de graficos.
+Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, dashboard automatico personalizavel, filtros globais, historico local, auditoria de qualidade, chat analitico e sugestoes de graficos.
 
 Tambem ja possui exportacao de relatorio em PDF/PNG apos o carregamento do dataset.

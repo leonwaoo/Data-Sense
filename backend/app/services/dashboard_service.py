@@ -48,17 +48,23 @@ DOMAIN_CANDIDATES = [
 ]
 
 
-def build_dashboard(dataset: DatasetSession) -> dict:
-    df = dataset.dataframe
-    profile = build_profile(dataset)
-    quality = build_quality_report(dataset)
+def build_dashboard(dataset: DatasetSession, filters: dict | None = None) -> dict:
+    base_profile = build_profile(dataset)
+    base_domain = _detect_domain(base_profile["column_names"])
+    base_date_column = _select_date_column(dataset.dataframe, base_profile["datetime_columns"], base_profile["column_names"])
+    base_dimensions = _select_dimensions(base_profile["categorical_columns"])
+    filtered_dataset, applied_filters = _apply_filters(dataset, filters or {}, base_date_column, base_dimensions)
+
+    df = filtered_dataset.dataframe
+    profile = build_profile(filtered_dataset)
+    quality = build_quality_report(filtered_dataset)
     domain = _detect_domain(profile["column_names"])
     main_metric = _select_main_metric(df, profile["numeric_columns"], domain["type"])
     date_column = _select_date_column(df, profile["datetime_columns"], profile["column_names"])
     dimensions = _select_dimensions(profile["categorical_columns"])
 
-    kpis = _build_kpis(dataset, quality, main_metric, date_column)
-    charts, insights = _build_charts(dataset, quality, main_metric, date_column, dimensions)
+    kpis = _build_kpis(filtered_dataset, quality, main_metric, date_column)
+    charts, insights = _build_charts(filtered_dataset, quality, main_metric, date_column, dimensions)
     insights.extend(_quality_insights(quality))
 
     if not charts:
@@ -71,6 +77,7 @@ def build_dashboard(dataset: DatasetSession) -> dict:
         "kpis": kpis,
         "charts": charts,
         "insights": insights[:6],
+        "filters": _build_filter_options(dataset, base_date_column, base_dimensions, applied_filters),
         "quality": {
             "score": quality["score"],
             "missing_total": quality["missing_total"],
@@ -196,6 +203,7 @@ def _monthly_chart(dataset: DatasetSession, date_column: str, metric_column: str
         return None
 
     best = result.sort_values("total", ascending=False).iloc[0]
+    movement = _monthly_movement(result)
     return {
         "chart": {
             "id": "evolucao_mensal",
@@ -205,10 +213,10 @@ def _monthly_chart(dataset: DatasetSession, date_column: str, metric_column: str
             "x": "periodo",
             "y": "total",
             "data": result.to_dict(orient="records"),
-            "insight": f"Maior periodo: {best['periodo']} com {_format_number(best['total'])}.",
-            "available_types": ["line", "bar"],
+            "insight": movement or f"Maior periodo: {best['periodo']} com {_format_number(best['total'])}.",
+            "available_types": ["line", "area", "bar"],
         },
-        "insight": f"A maior soma mensal de {metric_column} aparece em {best['periodo']}.",
+        "insight": movement or f"Oportunidade: a maior soma mensal de {metric_column} aparece em {best['periodo']}.",
     }
 
 
@@ -232,6 +240,7 @@ def _ranking_chart(dataset: DatasetSession, group_column: str, metric_column: st
         return None
 
     top = result.iloc[0]
+    share = float(top["total"] / result["total"].sum()) if float(result["total"].sum()) else 0
     return {
         "chart": {
             "id": f"ranking_{_slug(label)}",
@@ -241,10 +250,10 @@ def _ranking_chart(dataset: DatasetSession, group_column: str, metric_column: st
             "x": "grupo",
             "y": "total",
             "data": result.to_dict(orient="records"),
-            "insight": f"Principal {label}: {top['grupo']} com {_format_number(top['total'])}.",
-            "available_types": ["bar", "line"],
+            "insight": f"Principal {label}: {top['grupo']} com {_format_number(top['total'])} ({share:.1%} do top 8).",
+            "available_types": ["bar", "line", "pie"],
         },
-        "insight": f"{top['grupo']} lidera o ranking por {label}.",
+        "insight": f"Oportunidade: {top['grupo']} lidera o ranking por {label} com {share:.1%} do top 8.",
     }
 
 
@@ -301,12 +310,126 @@ def _quality_chart(dataset: DatasetSession, quality: dict) -> dict:
 def _quality_insights(quality: dict) -> list[str]:
     insights: list[str] = []
     if quality["missing_total"]:
-        insights.append(f"Existem {_format_number(quality['missing_total'])} valores nulos para revisar.")
+        insights.append(f"Qualidade: existem {_format_number(quality['missing_total'])} valores nulos para revisar.")
     if quality["duplicate_rows"]:
-        insights.append(f"Existem {_format_number(quality['duplicate_rows'])} linhas duplicadas.")
+        insights.append(f"Risco: existem {_format_number(quality['duplicate_rows'])} linhas duplicadas.")
+    if quality["score"] < 75:
+        insights.append("Risco: o score de qualidade recomenda validar a base antes de tomar decisoes.")
     if not insights:
-        insights.append("A auditoria inicial nao encontrou nulos ou duplicatas relevantes.")
+        insights.append("Qualidade: a auditoria inicial nao encontrou nulos ou duplicatas relevantes.")
     return insights
+
+
+def _monthly_movement(result: pd.DataFrame) -> str | None:
+    if result.shape[0] < 2:
+        return None
+
+    first = result.iloc[0]
+    last = result.iloc[-1]
+    first_total = float(first["total"] or 0)
+    last_total = float(last["total"] or 0)
+    if first_total == 0:
+        return f"Tendencia: o ultimo periodo fechou em {_format_number(last_total)}."
+
+    variation = (last_total - first_total) / abs(first_total)
+    direction = "cresceu" if variation >= 0 else "caiu"
+    return f"Tendencia: de {first['periodo']} a {last['periodo']}, o total {direction} {abs(variation):.1%}."
+
+
+def _apply_filters(
+    dataset: DatasetSession,
+    filters: dict,
+    date_column: str | None,
+    dimensions: list[tuple[str, str]],
+) -> tuple[DatasetSession, dict]:
+    df = dataset.dataframe.copy()
+    applied: dict = {
+        "date_from": None,
+        "date_to": None,
+        "categories": {},
+        "applied_count": 0,
+        "rows_before_filter": int(dataset.dataframe.shape[0]),
+    }
+
+    date_from = str(filters.get("date_from") or "").strip()
+    date_to = str(filters.get("date_to") or "").strip()
+    if date_column and (date_from or date_to):
+        parsed_dates = _parse_dates(df[date_column])
+        if date_from:
+            start = pd.to_datetime(date_from, errors="coerce")
+            if pd.notna(start):
+                df = df[parsed_dates >= start]
+                applied["date_from"] = str(start.date())
+                applied["applied_count"] += 1
+        if date_to:
+            end = pd.to_datetime(date_to, errors="coerce")
+            if pd.notna(end):
+                df = df[parsed_dates <= end]
+                applied["date_to"] = str(end.date())
+                applied["applied_count"] += 1
+
+    category_filters = filters.get("categories") if isinstance(filters.get("categories"), dict) else {}
+    available_dimension_columns = {column for _, column in dimensions}
+    for column, selected_values in category_filters.items():
+        if column not in available_dimension_columns or not isinstance(selected_values, list) or not selected_values:
+            continue
+
+        values = {str(value) for value in selected_values if str(value).strip()}
+        if not values:
+            continue
+
+        df = df[df[column].astype("string").isin(values)]
+        applied["categories"][column] = sorted(values)
+        applied["applied_count"] += 1
+
+    applied["rows_after_filter"] = int(df.shape[0])
+    return DatasetSession(dataset_id=dataset.dataset_id, file_name=dataset.file_name, dataframe=df.reset_index(drop=True)), applied
+
+
+def _build_filter_options(
+    dataset: DatasetSession,
+    date_column: str | None,
+    dimensions: list[tuple[str, str]],
+    applied_filters: dict,
+) -> dict:
+    date_filter = None
+    if date_column:
+        parsed_dates = _parse_dates(dataset.dataframe[date_column]).dropna()
+        if not parsed_dates.empty:
+            date_filter = {
+                "column": date_column,
+                "min": str(parsed_dates.min().date()),
+                "max": str(parsed_dates.max().date()),
+                "selected_from": applied_filters.get("date_from"),
+                "selected_to": applied_filters.get("date_to"),
+            }
+
+    category_filters: list[dict] = []
+    for label, column in dimensions[:4]:
+        series = dataset.dataframe[column].dropna().astype(str)
+        if series.empty:
+            continue
+
+        values = [
+            {"value": str(value), "count": int(count)}
+            for value, count in series.value_counts().head(10).items()
+        ]
+        category_filters.append(
+            {
+                "label": label,
+                "column": column,
+                "values": values,
+                "selected": applied_filters.get("categories", {}).get(column, []),
+            }
+        )
+
+    return {
+        "date": date_filter,
+        "categories": category_filters,
+        "applied_count": applied_filters["applied_count"],
+        "rows_before_filter": applied_filters["rows_before_filter"],
+        "rows_after_filter": applied_filters["rows_after_filter"],
+    }
 
 
 def _detect_domain(column_names: list[str]) -> dict:

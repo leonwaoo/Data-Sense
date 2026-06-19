@@ -40,6 +40,7 @@ O sistema atuara como um assistente para analise de dados:
 - Identifica colunas, tipos de dados, valores ausentes e possiveis problemas.
 - Permite perguntas em linguagem natural sobre os dados.
 - Gera consultas, tabelas resumidas, graficos e explicacoes para dados de vendas, compras, clientes, fornecedores, categorias e regioes.
+- Monta um dashboard automatico apos o upload com KPIs, evolucao mensal, rankings, nulos e score de qualidade.
 - Detecta anomalias e problemas de qualidade.
 - Sugere proximas analises e recomendacoes de negocio.
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
@@ -164,7 +165,7 @@ Use os arquivos:
 
 Eles possuem dados ficticios de vendas, compras, clientes e estoque/financeiro. O frontend tambem publica esses arquivos em `frontend/public/samples`, permitindo carregar exemplos diretamente pela interface.
 
-Perguntas úteis para teste:
+Perguntas uteis para teste:
 
 - `Mostre vendas por mes.`
 - `Top 5 produtos por faturamento.`
@@ -175,6 +176,6 @@ Perguntas úteis para teste:
 
 ## Status
 
-Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, auditoria de qualidade, chat analitico e sugestoes de graficos.
+Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, dashboard automatico, auditoria de qualidade, chat analitico e sugestoes de graficos.
 
 Tambem ja possui exportacao de relatorio em PDF/PNG apos o carregamento do dataset.

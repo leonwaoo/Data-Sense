@@ -1,4 +1,16 @@
-import { BarChart3, Database, Download, FileQuestion, FileSpreadsheet, Lightbulb, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import {
+  BarChart3,
+  Database,
+  Download,
+  FileQuestion,
+  FileSpreadsheet,
+  LayoutDashboard,
+  Lightbulb,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  UploadCloud,
+} from "lucide-react";
 import type { DragEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -63,6 +75,41 @@ type ChartSuggestion = {
   reason: string;
 };
 
+type DashboardKpi = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "neutral" | "accent" | "good" | "warning" | "danger";
+};
+
+type DashboardChart = ChartPayload & {
+  id: string;
+  title: string;
+  subtitle: string;
+  insight: string;
+  available_types?: string[];
+};
+
+type DashboardPayload = {
+  title: string;
+  subtitle: string;
+  domain: {
+    type: string;
+    label: string;
+    confidence: number;
+    reasons: string[];
+  };
+  kpis: DashboardKpi[];
+  charts: DashboardChart[];
+  insights: string[];
+  quality: {
+    score: number;
+    missing_total: number;
+    duplicate_rows: number;
+    empty_columns: string[];
+  };
+};
+
 const suggestedQuestions = [
   "Quantas linhas e colunas existem?",
   "Qual coluna tem mais valores ausentes?",
@@ -84,10 +131,12 @@ const sampleFiles = [
 
 export function App() {
   const [dataset, setDataset] = useState<UploadResponse | null>(null);
+  const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [chartSuggestions, setChartSuggestions] = useState<ChartSuggestion[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | null>(null);
@@ -113,6 +162,8 @@ export function App() {
     setIsUploading(true);
     setError(null);
     setAnswer(null);
+    setDashboard(null);
+    setChartSuggestions([]);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -130,11 +181,18 @@ export function App() {
 
       const uploadPayload: UploadResponse = await response.json();
       setDataset(uploadPayload);
-      setChartSuggestions(await fetchChartSuggestions(uploadPayload.dataset_id));
+      setIsDashboardLoading(true);
+      const [suggestions, dashboardPayload] = await Promise.all([
+        fetchChartSuggestions(uploadPayload.dataset_id).catch(() => []),
+        fetchDashboard(uploadPayload.dataset_id).catch(() => null),
+      ]);
+      setChartSuggestions(suggestions);
+      setDashboard(dashboardPayload);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Erro inesperado no upload.");
     } finally {
       setIsUploading(false);
+      setIsDashboardLoading(false);
     }
   }
 
@@ -180,6 +238,13 @@ export function App() {
 
     if (!response.ok) return [];
     return (await response.json()) as ChartSuggestion[];
+  }
+
+  async function fetchDashboard(datasetId: string) {
+    const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/dashboard`);
+
+    if (!response.ok) return null;
+    return (await response.json()) as DashboardPayload;
   }
 
   async function handleAsk(nextQuestion = question) {
@@ -332,6 +397,8 @@ export function App() {
         </section>
       ) : null}
 
+      {dataset ? <DashboardSection dashboard={dashboard} isLoading={isDashboardLoading} /> : null}
+
       <section className="workspace-grid">
         <div className="panel">
           <div className="panel-heading">
@@ -458,6 +525,114 @@ function EmptyState({ text }: { text: string }) {
   return <div className="empty-state">{text}</div>;
 }
 
+function DashboardSection({ dashboard, isLoading }: { dashboard: DashboardPayload | null; isLoading: boolean }) {
+  const [chartTypes, setChartTypes] = useState<Record<string, string>>({});
+
+  if (isLoading) {
+    return (
+      <section className="panel dashboard-panel">
+        <div className="panel-heading">
+          <h2>Dashboard automatico</h2>
+          <span>Gerando visualizacoes</span>
+        </div>
+        <EmptyState text="Montando KPIs, rankings, evolucao e qualidade do dataset." />
+      </section>
+    );
+  }
+
+  if (!dashboard) return null;
+
+  return (
+    <section className="panel dashboard-panel">
+      <div className="dashboard-heading">
+        <div>
+          <LayoutDashboard size={22} />
+          <div>
+            <h2>{dashboard.title}</h2>
+            <span>{dashboard.subtitle}</span>
+          </div>
+        </div>
+        <span className="domain-pill">
+          {dashboard.domain.label} - {Math.round(dashboard.domain.confidence * 100)}%
+        </span>
+      </div>
+
+      <div className="dashboard-kpis">
+        {dashboard.kpis.map((kpi) => (
+          <DashboardKpiCard key={`${kpi.label}-${kpi.value}`} kpi={kpi} />
+        ))}
+      </div>
+
+      <div className="dashboard-chart-grid">
+        {dashboard.charts.map((chart) => {
+          const selectedType = chartTypes[chart.id] ?? chart.type;
+          return (
+            <article className="dashboard-chart-card" key={chart.id}>
+              <div className="chart-card-heading">
+                <div>
+                  <strong>{chart.title}</strong>
+                  <span>{chart.subtitle}</span>
+                </div>
+                <ChartTypeControl
+                  activeType={selectedType}
+                  availableTypes={chart.available_types ?? [chart.type]}
+                  onChange={(type) => setChartTypes((current) => ({ ...current, [chart.id]: type }))}
+                />
+              </div>
+              <ChartRenderer chart={{ ...chart, type: selectedType }} height={250} />
+              <p>{chart.insight}</p>
+            </article>
+          );
+        })}
+      </div>
+
+      {dashboard.insights.length ? (
+        <div className="dashboard-insights">
+          <div>
+            <TrendingUp size={18} />
+            <strong>Principais leituras</strong>
+          </div>
+          {dashboard.insights.map((insight) => (
+            <span key={insight}>{insight}</span>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ChartTypeControl({
+  activeType,
+  availableTypes,
+  onChange,
+}: {
+  activeType: string;
+  availableTypes: string[];
+  onChange: (type: string) => void;
+}) {
+  if (availableTypes.length <= 1) return <small>{activeType}</small>;
+
+  return (
+    <div className="chart-type-toggle" aria-label="Tipo do grafico">
+      {availableTypes.map((type) => (
+        <button className={type === activeType ? "is-active" : ""} key={type} onClick={() => onChange(type)} type="button">
+          {type === "line" ? "Linha" : "Barra"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DashboardKpiCard({ kpi }: { kpi: DashboardKpi }) {
+  return (
+    <article className={`dashboard-kpi tone-${kpi.tone ?? "neutral"}`}>
+      <span>{kpi.label}</span>
+      <strong>{kpi.value}</strong>
+      <small>{kpi.detail}</small>
+    </article>
+  );
+}
+
 function AnswerView({ answer }: { answer: Answer }) {
   return (
     <div className="answer-box">
@@ -470,9 +645,13 @@ function AnswerView({ answer }: { answer: Answer }) {
 }
 
 function AnswerChart({ chart }: { chart: ChartPayload }) {
+  return <ChartRenderer chart={chart} height={240} />;
+}
+
+function ChartRenderer({ chart, height }: { chart: ChartPayload; height: number }) {
   if (chart.type === "line") {
     return (
-      <ResponsiveContainer height={240} width="100%">
+      <ResponsiveContainer height={height} width="100%">
         <LineChart data={chart.data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey={chart.x} />
@@ -485,7 +664,7 @@ function AnswerChart({ chart }: { chart: ChartPayload }) {
   }
 
   return (
-    <ResponsiveContainer height={240} width="100%">
+    <ResponsiveContainer height={height} width="100%">
       <BarChart data={chart.data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey={chart.x} />

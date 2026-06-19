@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.services.analytics_service import answer_question
 from app.services.chart_service import suggest_charts
+from app.services.dashboard_service import build_dashboard
 from app.services.dataset_service import get_dataset, load_dataset, supported_formats
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
@@ -92,6 +93,11 @@ def ask_dataset(dataset_id: str, payload: dict) -> dict:
 @app.post("/datasets/{dataset_id}/charts/suggest")
 def dataset_chart_suggestions(dataset_id: str) -> list[dict]:
     return suggest_charts(get_dataset(dataset_id))
+
+
+@app.get("/datasets/{dataset_id}/dashboard")
+def dataset_dashboard(dataset_id: str) -> dict:
+    return build_dashboard(get_dataset(dataset_id))
 
 
 @app.get("/datasets/{dataset_id}/report.pdf")

@@ -1,0 +1,457 @@
+import re
+import unicodedata
+
+import pandas as pd
+
+from app.models import DatasetSession
+from app.services.profile_service import build_profile
+from app.services.quality_service import build_quality_report
+
+VALUE_CANDIDATES = [
+    "faturamento",
+    "receita",
+    "venda",
+    "vendas",
+    "valor_venda",
+    "compra",
+    "compras",
+    "valor_compra",
+    "custo",
+    "custos",
+    "despesa",
+    "gasto",
+    "valor",
+    "total",
+    "preco",
+    "amount",
+    "price",
+    "lucro",
+    "margem",
+]
+QUANTITY_CANDIDATES = ["quantidade", "qtd", "volume", "unidade", "unidades", "units"]
+DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
+DIMENSION_CANDIDATES = [
+    ("produto", ["produto", "item", "sku", "servico", "produto_servico"]),
+    ("fornecedor", ["fornecedor", "supplier", "vendor"]),
+    ("cliente", ["cliente", "customer", "comprador"]),
+    ("categoria", ["categoria", "segmento", "tipo", "classe", "familia"]),
+    ("regiao", ["regiao", "estado", "cidade", "uf", "pais", "local"]),
+    ("canal", ["canal", "origem", "midia", "loja", "vendedor"]),
+    ("status", ["status", "situacao", "etapa"]),
+]
+DOMAIN_CANDIDATES = [
+    ("vendas", ["venda", "vendas", "faturamento", "receita", "cliente", "produto", "canal"]),
+    ("compras", ["compra", "compras", "fornecedor", "custo", "despesa", "gasto"]),
+    ("clientes", ["cliente", "customer", "comprador", "segmento", "cidade", "estado"]),
+    ("estoque", ["estoque", "produto", "sku", "quantidade", "qtd", "categoria"]),
+    ("financeiro", ["receita", "despesa", "custo", "lucro", "margem", "saldo", "valor"]),
+]
+
+
+def build_dashboard(dataset: DatasetSession) -> dict:
+    df = dataset.dataframe
+    profile = build_profile(dataset)
+    quality = build_quality_report(dataset)
+    domain = _detect_domain(profile["column_names"])
+    main_metric = _select_main_metric(df, profile["numeric_columns"], domain["type"])
+    date_column = _select_date_column(df, profile["datetime_columns"], profile["column_names"])
+    dimensions = _select_dimensions(profile["categorical_columns"])
+
+    kpis = _build_kpis(dataset, quality, main_metric, date_column)
+    charts, insights = _build_charts(dataset, quality, main_metric, date_column, dimensions)
+    insights.extend(_quality_insights(quality))
+
+    if not charts:
+        insights.append("Envie dados com colunas numericas, datas ou categorias para montar graficos automaticos mais completos.")
+
+    return {
+        "title": "Dashboard automatico",
+        "subtitle": _dashboard_subtitle(domain, main_metric, date_column, dimensions),
+        "domain": domain,
+        "kpis": kpis,
+        "charts": charts,
+        "insights": insights[:6],
+        "quality": {
+            "score": quality["score"],
+            "missing_total": quality["missing_total"],
+            "duplicate_rows": quality["duplicate_rows"],
+            "empty_columns": quality["empty_columns"],
+        },
+    }
+
+
+def _build_kpis(
+    dataset: DatasetSession,
+    quality: dict,
+    main_metric: str | None,
+    date_column: str | None,
+) -> list[dict]:
+    df = dataset.dataframe
+    total_cells = max(df.shape[0] * df.shape[1], 1)
+    missing_rate = quality["missing_total"] / total_cells
+    duplicate_rate = quality["duplicate_rows"] / max(df.shape[0], 1)
+
+    kpis = [
+        {
+            "label": "Registros",
+            "value": _format_number(df.shape[0]),
+            "detail": f"{df.shape[1]} colunas no dataset",
+            "tone": "neutral",
+        },
+        {
+            "label": "Score de qualidade",
+            "value": f"{quality['score']}/100",
+            "detail": _quality_label(quality["score"]),
+            "tone": "good" if quality["score"] >= 85 else "warning" if quality["score"] >= 65 else "danger",
+        },
+        {
+            "label": "Valores nulos",
+            "value": _format_number(quality["missing_total"]),
+            "detail": f"{missing_rate:.1%} das celulas",
+            "tone": "good" if quality["missing_total"] == 0 else "warning",
+        },
+        {
+            "label": "Duplicatas",
+            "value": _format_number(quality["duplicate_rows"]),
+            "detail": f"{duplicate_rate:.1%} das linhas",
+            "tone": "good" if quality["duplicate_rows"] == 0 else "warning",
+        },
+    ]
+
+    if main_metric:
+        series = pd.to_numeric(df[main_metric], errors="coerce").dropna()
+        if not series.empty:
+            kpis.insert(
+                1,
+                {
+                    "label": f"Total de {main_metric}",
+                    "value": _format_number(round(float(series.sum()), 2)),
+                    "detail": f"Media: {_format_number(round(float(series.mean()), 2))}",
+                    "tone": "accent",
+                },
+            )
+
+    if date_column:
+        parsed_dates = _parse_dates(df[date_column]).dropna()
+        if not parsed_dates.empty:
+            kpis.append(
+                {
+                    "label": "Periodo",
+                    "value": str(parsed_dates.dt.to_period("M").nunique()),
+                    "detail": f"{parsed_dates.min().date()} ate {parsed_dates.max().date()}",
+                    "tone": "neutral",
+                }
+            )
+
+    return kpis[:6]
+
+
+def _build_charts(
+    dataset: DatasetSession,
+    quality: dict,
+    main_metric: str | None,
+    date_column: str | None,
+    dimensions: list[tuple[str, str]],
+) -> tuple[list[dict], list[str]]:
+    charts: list[dict] = []
+    insights: list[str] = []
+
+    if main_metric and date_column:
+        monthly = _monthly_chart(dataset, date_column, main_metric)
+        if monthly:
+            charts.append(monthly["chart"])
+            insights.append(monthly["insight"])
+
+    if main_metric:
+        for label, column in dimensions[:3]:
+            ranking = _ranking_chart(dataset, column, main_metric, label)
+            if ranking:
+                charts.append(ranking["chart"])
+                insights.append(ranking["insight"])
+
+    missing_chart = _missing_chart(dataset, quality)
+    if missing_chart:
+        charts.append(missing_chart)
+
+    charts.append(_quality_chart(dataset, quality))
+    return charts[:5], insights
+
+
+def _monthly_chart(dataset: DatasetSession, date_column: str, metric_column: str) -> dict | None:
+    df = dataset.dataframe.copy()
+    df["_periodo"] = _parse_dates(df[date_column]).dt.to_period("M").astype(str)
+    df["_valor"] = pd.to_numeric(df[metric_column], errors="coerce")
+    df = df[df["_periodo"].ne("NaT") & df["_valor"].notna()]
+    if df.empty:
+        return None
+
+    result = (
+        df.groupby("_periodo", as_index=False)["_valor"]
+        .sum()
+        .rename(columns={"_periodo": "periodo", "_valor": "total"})
+        .sort_values("periodo")
+        .round(2)
+    )
+    if result.empty:
+        return None
+
+    best = result.sort_values("total", ascending=False).iloc[0]
+    return {
+        "chart": {
+            "id": "evolucao_mensal",
+            "title": "Evolucao por mes",
+            "subtitle": f"Soma de {metric_column} por {date_column}",
+            "type": "line",
+            "x": "periodo",
+            "y": "total",
+            "data": result.to_dict(orient="records"),
+            "insight": f"Maior periodo: {best['periodo']} com {_format_number(best['total'])}.",
+            "available_types": ["line", "bar"],
+        },
+        "insight": f"A maior soma mensal de {metric_column} aparece em {best['periodo']}.",
+    }
+
+
+def _ranking_chart(dataset: DatasetSession, group_column: str, metric_column: str, label: str) -> dict | None:
+    df = dataset.dataframe.copy()
+    df["_grupo"] = df[group_column].astype("string")
+    df["_valor"] = pd.to_numeric(df[metric_column], errors="coerce")
+    df = df[df["_grupo"].notna() & df["_valor"].notna()]
+    if df.empty:
+        return None
+
+    result = (
+        df.groupby("_grupo", as_index=False)["_valor"]
+        .sum()
+        .rename(columns={"_grupo": "grupo", "_valor": "total"})
+        .sort_values("total", ascending=False)
+        .head(8)
+        .round(2)
+    )
+    if result.empty:
+        return None
+
+    top = result.iloc[0]
+    return {
+        "chart": {
+            "id": f"ranking_{_slug(label)}",
+            "title": f"Ranking por {label}",
+            "subtitle": f"Soma de {metric_column} por {group_column}",
+            "type": "bar",
+            "x": "grupo",
+            "y": "total",
+            "data": result.to_dict(orient="records"),
+            "insight": f"Principal {label}: {top['grupo']} com {_format_number(top['total'])}.",
+            "available_types": ["bar", "line"],
+        },
+        "insight": f"{top['grupo']} lidera o ranking por {label}.",
+    }
+
+
+def _missing_chart(dataset: DatasetSession, quality: dict) -> dict | None:
+    missing = pd.Series(quality.get("missing_by_column", {}), dtype="int64").sort_values(ascending=False).head(8)
+    if missing.empty:
+        return None
+
+    if int(missing.sum()) == 0:
+        data = [{"coluna": "Sem nulos", "valores_ausentes": 0}]
+    else:
+        data = (
+            missing.reset_index()
+            .rename(columns={"index": "coluna", 0: "valores_ausentes"})
+            .to_dict(orient="records")
+        )
+
+    return {
+        "id": "nulos_por_coluna",
+        "title": "Nulos por coluna",
+        "subtitle": f"{dataset.file_name}",
+        "type": "bar",
+        "x": "coluna",
+        "y": "valores_ausentes",
+        "data": data,
+        "insight": "Colunas com mais vazios aparecem primeiro.",
+        "available_types": ["bar"],
+    }
+
+
+def _quality_chart(dataset: DatasetSession, quality: dict) -> dict:
+    df = dataset.dataframe
+    total_cells = max(df.shape[0] * df.shape[1], 1)
+    missing_rate = round((quality["missing_total"] / total_cells) * 100, 2)
+    duplicate_rate = round((quality["duplicate_rows"] / max(df.shape[0], 1)) * 100, 2)
+
+    return {
+        "id": "score_qualidade",
+        "title": "Score de qualidade",
+        "subtitle": "Quanto maior o score, melhor a confiabilidade inicial",
+        "type": "bar",
+        "x": "indicador",
+        "y": "valor",
+        "data": [
+            {"indicador": "Qualidade", "valor": int(quality["score"])},
+            {"indicador": "Nulos %", "valor": missing_rate},
+            {"indicador": "Duplicatas %", "valor": duplicate_rate},
+        ],
+        "insight": _quality_label(quality["score"]),
+        "available_types": ["bar"],
+    }
+
+
+def _quality_insights(quality: dict) -> list[str]:
+    insights: list[str] = []
+    if quality["missing_total"]:
+        insights.append(f"Existem {_format_number(quality['missing_total'])} valores nulos para revisar.")
+    if quality["duplicate_rows"]:
+        insights.append(f"Existem {_format_number(quality['duplicate_rows'])} linhas duplicadas.")
+    if not insights:
+        insights.append("A auditoria inicial nao encontrou nulos ou duplicatas relevantes.")
+    return insights
+
+
+def _detect_domain(column_names: list[str]) -> dict:
+    normalized_columns = [_normalize_text(column) for column in column_names]
+    scores: list[tuple[str, int, list[str]]] = []
+
+    for domain, candidates in DOMAIN_CANDIDATES:
+        hits = sorted({candidate for candidate in candidates for column in normalized_columns if candidate in column})
+        scores.append((domain, len(hits), hits[:4]))
+
+    domain, score, hits = max(scores, key=lambda item: item[1])
+    if score == 0:
+        return {
+            "type": "generico",
+            "label": "Dataset generico",
+            "confidence": 0.35,
+            "reasons": ["Nao foram encontradas colunas de dominio claras."],
+        }
+
+    confidence = min(0.95, 0.48 + score * 0.12)
+    return {
+        "type": domain,
+        "label": f"Dataset de {domain}",
+        "confidence": round(confidence, 2),
+        "reasons": [f"Colunas reconhecidas: {', '.join(hits)}"],
+    }
+
+
+def _select_main_metric(df: pd.DataFrame, numeric_columns: list[str], domain: str) -> str | None:
+    if not numeric_columns:
+        return None
+
+    domain_candidates = {
+        "vendas": ["faturamento", "receita", "venda", "vendas", "valor"],
+        "compras": ["compra", "compras", "custo", "despesa", "gasto", "valor"],
+        "financeiro": ["receita", "despesa", "custo", "lucro", "margem", "valor"],
+        "estoque": ["valor", "quantidade", "qtd", "estoque", "preco"],
+        "clientes": ["valor", "receita", "venda", "compras"],
+    }.get(domain, VALUE_CANDIDATES)
+
+    selected = _first_matching(numeric_columns, domain_candidates) or _first_matching(numeric_columns, VALUE_CANDIDATES)
+    if selected:
+        return selected
+
+    non_identifier_columns = [column for column in numeric_columns if not _looks_like_identifier(column)]
+    candidates = non_identifier_columns or numeric_columns
+    return max(candidates, key=lambda column: pd.to_numeric(df[column], errors="coerce").abs().sum(skipna=True))
+
+
+def _select_date_column(df: pd.DataFrame, datetime_columns: list[str], column_names: list[str]) -> str | None:
+    preferred = _first_matching(datetime_columns, DATE_CANDIDATES)
+    if preferred:
+        return preferred
+    if datetime_columns:
+        return datetime_columns[0]
+
+    for column in column_names:
+        if not _first_matching([column], DATE_CANDIDATES):
+            continue
+        parsed = _parse_dates(df[column])
+        if parsed.notna().mean() >= 0.6:
+            return column
+
+    return None
+
+
+def _select_dimensions(categorical_columns: list[str]) -> list[tuple[str, str]]:
+    dimensions: list[tuple[str, str]] = []
+    used: set[str] = set()
+    for label, candidates in DIMENSION_CANDIDATES:
+        column = _first_matching(categorical_columns, candidates)
+        if column and column not in used:
+            dimensions.append((label, column))
+            used.add(column)
+
+    for column in categorical_columns:
+        if column not in used:
+            dimensions.append(("grupo", column))
+            used.add(column)
+
+    return dimensions
+
+
+def _dashboard_subtitle(
+    domain: dict,
+    main_metric: str | None,
+    date_column: str | None,
+    dimensions: list[tuple[str, str]],
+) -> str:
+    parts = [domain["label"]]
+    if main_metric:
+        parts.append(f"metrica principal: {main_metric}")
+    if date_column:
+        parts.append(f"tempo: {date_column}")
+    if dimensions:
+        parts.append(f"ranking: {dimensions[0][1]}")
+    return " | ".join(parts)
+
+
+def _parse_dates(series: pd.Series) -> pd.Series:
+    parsed_default = pd.to_datetime(series, errors="coerce")
+    parsed_dayfirst = pd.to_datetime(series, errors="coerce", dayfirst=True)
+    return parsed_dayfirst if parsed_dayfirst.notna().sum() >= parsed_default.notna().sum() else parsed_default
+
+
+def _first_matching(columns: list[str], candidates: list[str]) -> str | None:
+    for candidate in candidates:
+        for column in columns:
+            if candidate in _normalize_text(column):
+                return column
+    return None
+
+
+def _looks_like_identifier(column: str) -> bool:
+    normalized = _normalize_text(column)
+    identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
+    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
+
+
+def _quality_label(score: int) -> str:
+    if score >= 90:
+        return "Base muito consistente"
+    if score >= 75:
+        return "Base boa com pontos de atencao"
+    if score >= 55:
+        return "Base exige revisao antes de decisoes"
+    return "Base critica para analise"
+
+
+def _format_number(value) -> str:
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, int):
+        return f"{value:,}".replace(",", ".")
+    if isinstance(value, float):
+        return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return str(value)
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", _normalize_text(value)).strip("_")
+
+
+def _normalize_text(value: str) -> str:
+    text = unicodedata.normalize("NFKD", str(value))
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower())
+    return re.sub(r"_+", "_", text).strip("_")

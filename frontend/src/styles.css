@@ -200,7 +200,8 @@ h2 {
 
 .metric-card,
 .panel,
-.insight-strip {
+.insight-strip,
+.sample-strip {
   background: #ffffff;
   border: 1px solid #dbe5ef;
   border-radius: 8px;
@@ -253,6 +254,76 @@ h2 {
 .insight-strip strong {
   color: #0f766e;
   white-space: nowrap;
+}
+
+.sample-strip {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 14px 16px;
+}
+
+.sample-strip > div,
+.sample-action,
+.sample-action button,
+.sample-action a {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.sample-strip > div {
+  color: #0f172a;
+}
+
+.sample-strip > div svg {
+  color: #0f766e;
+}
+
+.sample-strip nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sample-action {
+  gap: 0;
+}
+
+.sample-action button,
+.sample-action a {
+  background: #f8fafc;
+  border: 1px solid #dbe5ef;
+  color: #334155;
+  font-size: 0.88rem;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 7px 10px;
+  text-decoration: none;
+}
+
+.sample-action button {
+  border-radius: 999px 0 0 999px;
+}
+
+.sample-action a {
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  justify-content: center;
+  min-width: 34px;
+  padding: 7px 9px;
+}
+
+.sample-action button:hover:not(:disabled),
+.sample-action a:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.sample-action button:hover:not(:disabled) + a {
+  border-color: #0f766e;
 }
 
 .panel {
@@ -459,9 +530,18 @@ th {
   }
 
   .panel-heading,
-  .insight-strip {
+  .insight-strip,
+  .sample-strip {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .sample-strip {
+    display: flex;
+  }
+
+  .sample-strip nav {
+    justify-content: flex-start;
   }
 
   .insight-strip strong {

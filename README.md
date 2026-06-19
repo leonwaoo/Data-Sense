@@ -10,6 +10,12 @@ O DataSense e uma aplicacao onde o usuario faz upload de uma planilha ou arquivo
 - API publicada: `https://data-sense-api.onrender.com`
 - Documentacao da API: `https://data-sense-api.onrender.com/docs`
 
+## Preview
+
+![Tela inicial do DataSense](docs/assets/datasense-home.png)
+
+![DataSense com dataset de vendas carregado](docs/assets/datasense-demo-vendas.png)
+
 ## Objetivo
 
 Criar um produto demonstravel para entrevistas e processos seletivos, mostrando habilidades em:
@@ -55,7 +61,12 @@ frontend/
   src/
 data/
   sample/
+    clientes_demo.json
+    compras_demo.csv
+    compras_demo.xlsx
+    estoque_financeiro_demo.tsv
     vendas_demo.csv
+    vendas_demo.xlsx
 docs/
 ```
 
@@ -141,11 +152,25 @@ O limite inicial de upload e de 15 MB.
 
 ### Dataset demonstrativo
 
-Use o arquivo:
+Use os arquivos:
 
 - `data/sample/vendas_demo.csv`
+- `data/sample/vendas_demo.xlsx`
+- `data/sample/compras_demo.csv`
+- `data/sample/compras_demo.xlsx`
+- `data/sample/clientes_demo.json`
+- `data/sample/estoque_financeiro_demo.tsv`
 
-Ele possui vendas ficticias com produto, categoria, regiao, faturamento, valores ausentes, duplicata e outlier simples para demonstrar o MVP.
+Eles possuem dados ficticios de vendas, compras, clientes e estoque/financeiro. O frontend tambem publica esses arquivos em `frontend/public/samples`, permitindo carregar exemplos diretamente pela interface.
+
+Perguntas úteis para teste:
+
+- `Mostre vendas por mes.`
+- `Top 5 produtos por faturamento.`
+- `Top 5 fornecedores por compras.`
+- `Mostre compras por mes.`
+- `Mostre clientes por receita.`
+- `Mostre valor_total por produto.`
 
 ## Status
 

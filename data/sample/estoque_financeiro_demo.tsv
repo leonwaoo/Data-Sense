@@ -1,0 +1,10 @@
+mes	produto	categoria	estoque_inicial	entradas	saidas	estoque_final	custo_unitario	valor_total	status
+2026-01	Notebook Pro	Eletronicos	14	8	6	16	4200.0	67200.0	Saudavel
+2026-01	Monitor 27	Eletronicos	22	10	9	23	880.0	20240.0	Saudavel
+2026-01	Cadeira Ergo	Moveis	18	7	10	15	520.0	7800.0	Atencao
+2026-02	Notebook Pro	Eletronicos	16	12	9	19	4200.0	79800.0	Saudavel
+2026-02	Mouse Sem Fio	Acessorios	80	35	42	73	65.0	4745.0	Saudavel
+2026-02	Headset Pro	Acessorios	26	12	18	20	145.0	2900.0	Atencao
+2026-03	Servidor Mini	Eletronicos	4	2	5	1	14200.0	14200.0	Critico
+2026-03	Mesa Ajustavel	Moveis	9	6	7	8	980.0	7840.0	Atencao
+2026-03	Teclado Mecanico	Acessorios	38	20	18	40	210.0	8400.0	Saudavel

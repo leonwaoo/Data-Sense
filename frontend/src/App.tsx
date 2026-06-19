@@ -1,6 +1,6 @@
-import { BarChart3, Database, FileQuestion, FileSpreadsheet, Lightbulb, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import { BarChart3, Database, Download, FileQuestion, FileSpreadsheet, Lightbulb, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 import type { DragEvent, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const API_BASE_URL =
@@ -74,6 +74,14 @@ const suggestedQuestions = [
   "Mostre quantidade por categoria.",
 ];
 
+const sampleFiles = [
+  { label: "Vendas CSV", fileName: "vendas_demo.csv", href: "/samples/vendas_demo.csv" },
+  { label: "Vendas Excel", fileName: "vendas_demo.xlsx", href: "/samples/vendas_demo.xlsx" },
+  { label: "Compras Excel", fileName: "compras_demo.xlsx", href: "/samples/compras_demo.xlsx" },
+  { label: "Clientes JSON", fileName: "clientes_demo.json", href: "/samples/clientes_demo.json" },
+  { label: "Estoque TSV", fileName: "estoque_financeiro_demo.tsv", href: "/samples/estoque_financeiro_demo.tsv" },
+];
+
 export function App() {
   const [dataset, setDataset] = useState<UploadResponse | null>(null);
   const [question, setQuestion] = useState("");
@@ -83,6 +91,12 @@ export function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sampleName = new URLSearchParams(window.location.search).get("sample");
+    const sample = sampleFiles.find((file) => file.fileName === sampleName);
+    if (sample) void handleSampleUpload(sample);
+  }, []);
 
   const missingChartData = useMemo(() => {
     if (!dataset) return [];
@@ -120,6 +134,23 @@ export function App() {
       setError(uploadError instanceof Error ? uploadError.message : "Erro inesperado no upload.");
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function handleSampleUpload(sample: (typeof sampleFiles)[number]) {
+    setError(null);
+
+    try {
+      const response = await fetch(sample.href);
+      if (!response.ok) throw new Error("Nao foi possivel carregar o arquivo de teste.");
+
+      const blob = await response.blob();
+      const file = new File([blob], sample.fileName, {
+        type: blob.type || "application/octet-stream",
+      });
+      await handleUpload(file);
+    } catch (sampleError) {
+      setError(sampleError instanceof Error ? sampleError.message : "Erro inesperado ao carregar o arquivo de teste.");
     }
   }
 
@@ -230,6 +261,25 @@ export function App() {
           <span>{dataset ? "Dataset carregado e pronto para analise" : "Teste com CSV, Excel, TSV, TXT ou JSON tabular"}</span>
         </div>
         <strong>{dataset ? `${dataset.profile.datetime_columns.length} data(s), ${dataset.profile.numeric_columns.length} metrica(s)` : "DataSense"}</strong>
+      </section>
+
+      <section className="sample-strip">
+        <div>
+          <FileSpreadsheet size={18} />
+          <strong>Arquivos de teste</strong>
+        </div>
+        <nav aria-label="Arquivos de teste">
+          {sampleFiles.map((file) => (
+            <span className="sample-action" key={file.href}>
+              <button disabled={isUploading} onClick={() => void handleSampleUpload(file)} type="button">
+                {file.label}
+              </button>
+              <a aria-label={`Baixar ${file.label}`} download href={file.href}>
+                <Download size={15} />
+              </a>
+            </span>
+          ))}
+        </nav>
       </section>
 
       <section className="workspace-grid">

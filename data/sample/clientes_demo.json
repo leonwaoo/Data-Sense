@@ -1,0 +1,112 @@
+[
+  {
+    "data_cadastro": "2026-01-02",
+    "cliente": "Acme Corp",
+    "segmento": "Enterprise",
+    "cidade": "Sao Paulo",
+    "estado": "SP",
+    "status": "Ativo",
+    "receita": 42800.0,
+    "tickets": 7,
+    "risco_churn": "Baixo"
+  },
+  {
+    "data_cadastro": "2026-01-08",
+    "cliente": "Norte Solar",
+    "segmento": "SMB",
+    "cidade": "Belem",
+    "estado": "PA",
+    "status": "Ativo",
+    "receita": 12600.0,
+    "tickets": 3,
+    "risco_churn": "Medio"
+  },
+  {
+    "data_cadastro": "2026-01-21",
+    "cliente": "Clinica Boa Vista",
+    "segmento": "Saude",
+    "cidade": "Recife",
+    "estado": "PE",
+    "status": "Ativo",
+    "receita": 23800.0,
+    "tickets": 5,
+    "risco_churn": "Baixo"
+  },
+  {
+    "data_cadastro": "2026-02-06",
+    "cliente": "Futura Edu",
+    "segmento": "Educacao",
+    "cidade": "Curitiba",
+    "estado": "PR",
+    "status": "Inativo",
+    "receita": 5200.0,
+    "tickets": 1,
+    "risco_churn": "Alto"
+  },
+  {
+    "data_cadastro": "2026-02-19",
+    "cliente": "Mercado Central",
+    "segmento": "Varejo",
+    "cidade": "Rio de Janeiro",
+    "estado": "RJ",
+    "status": "Ativo",
+    "receita": 31600.0,
+    "tickets": 6,
+    "risco_churn": "Medio"
+  },
+  {
+    "data_cadastro": "2026-03-04",
+    "cliente": "Log Prime",
+    "segmento": "Logistica",
+    "cidade": "Goiania",
+    "estado": "GO",
+    "status": "Ativo",
+    "receita": 18450.0,
+    "tickets": 4,
+    "risco_churn": "Baixo"
+  },
+  {
+    "data_cadastro": "2026-03-16",
+    "cliente": "Construtora Leste",
+    "segmento": "Enterprise",
+    "cidade": "Salvador",
+    "estado": "BA",
+    "status": "Ativo",
+    "receita": 55200.0,
+    "tickets": 8,
+    "risco_churn": "Baixo"
+  },
+  {
+    "data_cadastro": "2026-04-01",
+    "cliente": "Studio Pixel",
+    "segmento": "SMB",
+    "cidade": "Florianopolis",
+    "estado": "SC",
+    "status": "Ativo",
+    "receita": 9800.0,
+    "tickets": 2,
+    "risco_churn": "Medio"
+  },
+  {
+    "data_cadastro": "2026-04-15",
+    "cliente": "Agro Vale",
+    "segmento": "Agro",
+    "cidade": "Uberlandia",
+    "estado": "MG",
+    "status": "Ativo",
+    "receita": 27300.0,
+    "tickets": 4,
+    "risco_churn": "Baixo"
+  },
+  {
+    "data_cadastro": "2026-05-02",
+    "cliente": "Rede Mais",
+    "segmento": "Varejo",
+    "cidade": "Fortaleza",
+    "estado": "CE",
+    "status": "Inativo",
+    "receita": 7600.0,
+    "tickets": 2,
+    "risco_churn": "Alto"
+  }
+]

@@ -7,6 +7,11 @@ def suggest_charts(dataset: DatasetSession) -> list[dict]:
     numeric_columns = profile["numeric_columns"]
     categorical_columns = profile["categorical_columns"]
     datetime_columns = profile["datetime_columns"]
+    date_candidate_columns = [
+        candidate["column"]
+        for candidate in profile.get("date_candidates", [])
+        if candidate.get("column") in dataset.dataframe.columns
+    ]
     suggestions: list[dict] = []
 
     value_column = _first_matching(
@@ -41,12 +46,13 @@ def suggest_charts(dataset: DatasetSession) -> list[dict]:
             }
         )
 
-    if datetime_columns and value_column:
+    date_columns = datetime_columns or date_candidate_columns
+    if date_columns and value_column:
         suggestions.append(
             {
                 "title": f"Evolucao de {value_column} ao longo do tempo",
                 "type": "line",
-                "x": datetime_columns[0],
+                "x": date_columns[0],
                 "y": value_column,
                 "reason": "Ajuda a observar tendencia, sazonalidade e picos.",
             }

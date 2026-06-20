@@ -112,6 +112,7 @@ def _build_evidence(dataset: DatasetSession, profile: dict, quality: dict, dashb
             "file_name": dataset.file_name,
             "rows": profile["rows"],
             "columns": profile["columns"],
+            "ingest_report": profile.get("ingest_report", {}),
         },
         "profile": {
             "column_names": profile["column_names"],
@@ -130,6 +131,8 @@ def _build_evidence(dataset: DatasetSession, profile: dict, quality: dict, dashb
             "duplicate_rate": round(duplicate_rate, 4),
             "empty_columns": quality["empty_columns"],
             "numeric_outliers": quality.get("numeric_outliers", {}),
+            "numeric_outlier_details": quality.get("numeric_outlier_details", []),
+            "score_breakdown": quality.get("score_breakdown", []),
         },
         "dashboard": {
             "domain": dashboard_domain,
@@ -147,6 +150,7 @@ def _build_evidence(dataset: DatasetSession, profile: dict, quality: dict, dashb
             "id_like_numeric_columns": [column for column in profile["numeric_columns"] if _looks_like_identifier(column)],
             "sample_values": _sample_values_by_column(df),
             "sample_rows": _safe_records(df.head(8)),
+            "ingest_warnings": profile.get("ingest_report", {}).get("warnings", []),
         },
     }
 
@@ -160,6 +164,7 @@ def _build_rule_audit(evidence: dict) -> dict:
     _check_duplicates(evidence, findings)
     _check_outliers(evidence, findings)
     _check_numeric_identifiers(evidence, findings)
+    _check_ingest_warnings(evidence, findings)
 
     if not findings:
         findings.append(
@@ -394,10 +399,20 @@ def _check_outliers(evidence: dict, findings: list[dict]) -> None:
     if not outliers:
         return
 
+    details = evidence["quality"].get("numeric_outlier_details", [])
     rows = max(evidence["dataset"]["rows"], 1)
     worst = sorted(outliers.items(), key=lambda item: item[1], reverse=True)
     worst_rate = worst[0][1] / rows
     severity = "warning" if worst_rate >= 0.08 else "info"
+    evidence_lines = [
+        f"{column}: {count} outlier(s)"
+        for column, count in worst[:5]
+    ]
+    if details:
+        evidence_lines = [
+            f"{item['column']} linha {item['row_index']}: valor {item['value']} ({item['deviation_ratio']}x da media)"
+            for item in details[:4]
+        ]
     findings.append(
         _finding(
             "outliers_numericos",
@@ -406,7 +421,7 @@ def _check_outliers(evidence: dict, findings: list[dict]) -> None:
             "Outliers numericos podem distorcer medias",
             f"{len(outliers)} coluna(s) numerica(s) possuem valores fora do padrao pelo criterio de intervalo interquartil.",
             "Validar se os maiores valores sao reais antes de usar medias, totais e graficos de tendencia.",
-            [f"{column}: {count} outlier(s)" for column, count in worst[:5]],
+            evidence_lines,
         )
     )
 
@@ -444,6 +459,22 @@ def _check_numeric_identifiers(evidence: dict, findings: list[dict]) -> None:
         )
 
 
+def _check_ingest_warnings(evidence: dict, findings: list[dict]) -> None:
+    warnings = evidence["checks"].get("ingest_warnings", [])
+    if not warnings:
+        return
+
+    findings.append(
+        _finding(
+            "avisos_ingestao",
+            "warning",
+            "ingestao",
+            "Ingestao gerou avisos de sanidade",
+            "O parser precisou ajustar cabecalho, pular metadados ou reconciliar contagens antes da analise.",
+            "Comparar o preview do DataSense com as primeiras linhas do arquivo original antes de confiar nos totais.",
+            [str(warning) for warning in warnings[:4]],
+        )
+    )
 def _request_ai_audit(evidence: dict, rule_audit: dict, api_key: str, model: str) -> dict:
     url = os.getenv("OPENAI_RESPONSES_URL", OPENAI_RESPONSES_URL).strip() or OPENAI_RESPONSES_URL
     body = {

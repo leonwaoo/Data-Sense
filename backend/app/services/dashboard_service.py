@@ -4,6 +4,7 @@ import unicodedata
 import pandas as pd
 
 from app.models import DatasetSession
+from app.services.date_utils import parse_common_dates
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
@@ -52,7 +53,8 @@ METRIC_NOISE_TERMS = [
     "percentual",
     "taxa",
 ]
-NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento"]
+NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento", "ajuste", "abatimento"]
+NEGATIVE_ALLOWED_TERMS = ["lucro", "margem", "saldo"]
 QUANTITY_CANDIDATES = ["quantidade", "qtd", "volume", "unidade", "unidades", "units"]
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 DIMENSION_CANDIDATES = [
@@ -105,9 +107,12 @@ def build_dashboard(dataset: DatasetSession, filters: dict | None = None) -> dic
         "filters": _build_filter_options(dataset, base_date_column, base_dimensions, applied_filters),
         "quality": {
             "score": quality["score"],
+            "score_breakdown": quality.get("score_breakdown", []),
             "missing_total": quality["missing_total"],
             "duplicate_rows": quality["duplicate_rows"],
             "empty_columns": quality["empty_columns"],
+            "numeric_outliers": quality.get("numeric_outliers", {}),
+            "numeric_outlier_details": quality.get("numeric_outlier_details", []),
         },
     }
 
@@ -299,7 +304,7 @@ def _missing_chart(dataset: DatasetSession, quality: dict) -> dict | None:
     return {
         "id": "nulos_por_coluna",
         "title": "Nulos por coluna",
-        "subtitle": f"{dataset.file_name}",
+        "subtitle": _display_label(dataset.file_name, 64),
         "type": "bar",
         "x": "coluna",
         "y": "valores_ausentes",
@@ -314,11 +319,13 @@ def _quality_chart(dataset: DatasetSession, quality: dict) -> dict:
     total_cells = max(df.shape[0] * df.shape[1], 1)
     missing_rate = round((quality["missing_total"] / total_cells) * 100, 2)
     duplicate_rate = round((quality["duplicate_rows"] / max(df.shape[0], 1)) * 100, 2)
+    outlier_count = sum(quality.get("numeric_outliers", {}).values())
+    outlier_rate = round((outlier_count / max(df.shape[0], 1)) * 100, 2)
 
     return {
         "id": "score_qualidade",
         "title": "Score de qualidade",
-        "subtitle": "Quanto maior o score, melhor a confiabilidade inicial",
+        "subtitle": "Score, nulos, duplicatas e outliers em pontos percentuais",
         "type": "bar",
         "x": "indicador",
         "y": "valor",
@@ -326,6 +333,7 @@ def _quality_chart(dataset: DatasetSession, quality: dict) -> dict:
             {"indicador": "Qualidade", "valor": int(quality["score"])},
             {"indicador": "Nulos %", "valor": missing_rate},
             {"indicador": "Duplicatas %", "valor": duplicate_rate},
+            {"indicador": "Outliers %", "valor": outlier_rate},
         ],
         "insight": _quality_label(quality["score"]),
         "available_types": ["bar"],
@@ -340,6 +348,12 @@ def _quality_insights(quality: dict) -> list[str]:
         insights.append(f"Risco: existem {_format_number(quality['duplicate_rows'])} linhas duplicadas.")
     if quality["score"] < 75:
         insights.append("Risco: o score de qualidade recomenda validar a base antes de tomar decisoes.")
+    outlier_details = quality.get("numeric_outlier_details", [])
+    if outlier_details:
+        first = outlier_details[0]
+        insights.append(
+            f"Outlier: {first['column']} na linha {first['row_index']} tem valor {_format_number(first['value'])}."
+        )
     if not insights:
         insights.append("Qualidade: a auditoria inicial nao encontrou nulos ou duplicatas relevantes.")
     return insights
@@ -408,7 +422,12 @@ def _apply_filters(
         applied["applied_count"] += 1
 
     applied["rows_after_filter"] = int(df.shape[0])
-    return DatasetSession(dataset_id=dataset.dataset_id, file_name=dataset.file_name, dataframe=df.reset_index(drop=True)), applied
+    return DatasetSession(
+        dataset_id=dataset.dataset_id,
+        file_name=dataset.file_name,
+        dataframe=df.reset_index(drop=True),
+        ingest_report=dataset.ingest_report,
+    ), applied
 
 
 def _build_filter_options(
@@ -504,7 +523,11 @@ def _select_main_metric(df: pd.DataFrame, numeric_columns: list[str], domain: st
         return scored_columns[0][1]
 
     non_identifier_columns = [column for column in numeric_columns if not _looks_like_identifier(column)]
-    non_noise_columns = [column for column in non_identifier_columns if not _is_metric_noise(column)]
+    non_noise_columns = [
+        column
+        for column in non_identifier_columns
+        if not _is_metric_noise(column) and not _is_adjustment_metric(column)
+    ]
     candidates = non_noise_columns or non_identifier_columns or numeric_columns
     return max(candidates, key=lambda column: pd.to_numeric(df[column], errors="coerce").clip(lower=0).sum(skipna=True))
 
@@ -522,8 +545,8 @@ def _metric_score(df: pd.DataFrame, column: str, domain: str, domain_candidates:
         if candidate in normalized:
             score += max(10, 80 - index * 3)
 
-    if any(term in normalized for term in NEGATIVE_METRIC_TERMS):
-        score -= 90
+    if _is_adjustment_metric(column):
+        score -= 220
     if domain == "vendas" and any(term in normalized for term in ["compra", "custo", "despesa", "gasto"]):
         score -= 70
     if domain == "compras" and any(term in normalized for term in ["receita", "faturamento", "venda"]):
@@ -534,8 +557,10 @@ def _metric_score(df: pd.DataFrame, column: str, domain: str, domain_candidates:
         return -1000
 
     negative_ratio = float((series < 0).sum() / len(series))
-    if negative_ratio > 0 and not any(term in normalized for term in ["lucro", "margem", "saldo"]):
-        score -= 65 * negative_ratio
+    if negative_ratio > 0 and not any(term in normalized for term in NEGATIVE_ALLOWED_TERMS):
+        score -= 160 * negative_ratio
+    if negative_ratio >= 0.35 and not any(term in normalized for term in NEGATIVE_ALLOWED_TERMS):
+        score -= 120
     if float(series.abs().sum()) == 0:
         score -= 40
 
@@ -584,18 +609,16 @@ def _dashboard_subtitle(
 ) -> str:
     parts = [domain["label"]]
     if main_metric:
-        parts.append(f"metrica principal: {main_metric}")
+        parts.append(f"metrica principal: {_display_label(main_metric, 36)}")
     if date_column:
-        parts.append(f"tempo: {date_column}")
+        parts.append(f"tempo: {_display_label(date_column, 36)}")
     if dimensions:
-        parts.append(f"ranking: {dimensions[0][1]}")
+        parts.append(f"ranking: {_display_label(dimensions[0][1], 36)}")
     return " | ".join(parts)
 
 
 def _parse_dates(series: pd.Series) -> pd.Series:
-    parsed_default = pd.to_datetime(series, errors="coerce")
-    parsed_dayfirst = pd.to_datetime(series, errors="coerce", dayfirst=True)
-    return parsed_dayfirst if parsed_dayfirst.notna().sum() > parsed_default.notna().sum() else parsed_default
+    return parse_common_dates(series)
 
 
 def _first_matching(columns: list[str], candidates: list[str]) -> str | None:
@@ -615,6 +638,11 @@ def _looks_like_identifier(column: str) -> bool:
 def _is_metric_noise(column: str) -> bool:
     normalized = _normalize_text(column)
     return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
+
+
+def _is_adjustment_metric(column: str) -> bool:
+    normalized = _normalize_text(column)
+    return any(term in normalized for term in NEGATIVE_METRIC_TERMS)
 
 
 def _quality_label(score: int) -> str:
@@ -639,6 +667,16 @@ def _format_number(value) -> str:
 
 def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", _normalize_text(value)).strip("_")
+
+
+def _display_label(value: str, limit: int = 64) -> str:
+    text = unicodedata.normalize("NFKD", str(value))
+    text = "".join(character for character in text if not unicodedata.category(character).startswith("C"))
+    text = re.sub(r"[^\w\s.,:/()%-]+", "", text, flags=re.UNICODE)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[: max(limit - 3, 1)].rstrip()}..."
 
 
 def _normalize_text(value: str) -> str:

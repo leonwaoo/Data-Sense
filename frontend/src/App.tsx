@@ -54,6 +54,14 @@ type CellValue = string | number | boolean | null;
 type Profile = {
   dataset_id: string;
   file_name: string;
+  ingest_report?: {
+    header_row_number?: number | null;
+    metadata_rows_skipped?: number;
+    parsed_rows?: number;
+    raw_rows_estimate?: number;
+    expected_data_rows?: number | null;
+    warnings?: string[];
+  };
   rows: number;
   columns: number;
   column_names: string[];
@@ -66,14 +74,39 @@ type Profile = {
     confidence: number;
     message: string;
   }[];
+  date_candidates?: {
+    column: string;
+    kind: string;
+    confidence: number;
+  }[];
   missing_values: Record<string, number>;
+};
+
+type ScoreBreakdownItem = {
+  label: string;
+  weight: number;
+  lost_points: number;
+  detail: string;
+};
+
+type NumericOutlierDetail = {
+  column: string;
+  row_index: number | string;
+  value: number;
+  mean: number;
+  deviation_ratio: number;
+  lower_bound: number;
+  upper_bound: number;
 };
 
 type Quality = {
   score: number;
+  score_breakdown?: ScoreBreakdownItem[];
   missing_total: number;
   duplicate_rows: number;
   empty_columns: string[];
+  numeric_outliers?: Record<string, number>;
+  numeric_outlier_details?: NumericOutlierDetail[];
   recommendations: string[];
 };
 
@@ -161,9 +194,12 @@ type DashboardPayload = {
   filters: DashboardFilterControls;
   quality: {
     score: number;
+    score_breakdown?: ScoreBreakdownItem[];
     missing_total: number;
     duplicate_rows: number;
     empty_columns: string[];
+    numeric_outliers?: Record<string, number>;
+    numeric_outlier_details?: NumericOutlierDetail[];
   };
 };
 
@@ -623,6 +659,20 @@ export function App() {
                   ))}
                 </div>
               ) : null}
+              {dataset.profile.ingest_report?.warnings?.length ? (
+                <div className="ingest-report-list">
+                  <strong>Sanidade da ingestao</strong>
+                  {dataset.profile.ingest_report.header_row_number ? (
+                    <p>
+                      Cabecalho detectado na linha {dataset.profile.ingest_report.header_row_number};{" "}
+                      {dataset.profile.ingest_report.metadata_rows_skipped ?? 0} linha(s) acima foram tratadas como metadado.
+                    </p>
+                  ) : null}
+                  {dataset.profile.ingest_report.warnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              ) : null}
               <div className="chart-box">
                 <ResponsiveContainer height={220} width="100%">
                   <BarChart data={missingChartData}>
@@ -654,6 +704,26 @@ export function App() {
                   <p key={recommendation}>{recommendation}</p>
                 ))}
               </div>
+              {dataset.quality.score_breakdown?.length ? (
+                <div className="score-breakdown-list">
+                  <strong>Formula do score</strong>
+                  {dataset.quality.score_breakdown.map((item) => (
+                    <p key={item.label}>
+                      {item.label}: peso {item.weight}, perda {item.lost_points.toLocaleString("pt-BR")} ponto(s).
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              {dataset.quality.numeric_outlier_details?.length ? (
+                <div className="outlier-list">
+                  <strong>Outliers nomeados</strong>
+                  {dataset.quality.numeric_outlier_details.slice(0, 4).map((item) => (
+                    <p key={`${item.column}-${item.row_index}-${item.value}`}>
+                      {item.column}, linha {item.row_index}: {item.value.toLocaleString("pt-BR")} ({item.deviation_ratio}x da media)
+                    </p>
+                  ))}
+                </div>
+              ) : null}
               {isQualityAuditLoading ? <div className="audit-loading">Revisando confiabilidade da analise...</div> : null}
               {qualityAudit ? <QualityAuditView audit={qualityAudit} /> : null}
             </>
@@ -1240,12 +1310,14 @@ function AnswerChart({ chart }: { chart: ChartPayload }) {
 }
 
 function ChartRenderer({ chart, colors, height }: { chart: ChartPayload; colors: string[]; height: number }) {
+  const xAxisProps = getXAxisProps(chart);
+
   if (chart.type === "area") {
     return (
       <ResponsiveContainer height={height} width="100%">
         <AreaChart data={chart.data}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={chart.x} />
+          <XAxis dataKey={chart.x} {...xAxisProps} />
           <YAxis />
           <Tooltip />
           <Area dataKey={chart.y} fill={colors[0]} fillOpacity={0.18} stroke={colors[0]} strokeWidth={3} type="monotone" />
@@ -1259,7 +1331,7 @@ function ChartRenderer({ chart, colors, height }: { chart: ChartPayload; colors:
       <ResponsiveContainer height={height} width="100%">
         <LineChart data={chart.data}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={chart.x} />
+          <XAxis dataKey={chart.x} {...xAxisProps} />
           <YAxis />
           <Tooltip />
           <Line dataKey={chart.y} stroke={colors[0]} strokeWidth={3} type="monotone" />
@@ -1287,13 +1359,22 @@ function ChartRenderer({ chart, colors, height }: { chart: ChartPayload; colors:
     <ResponsiveContainer height={height} width="100%">
       <BarChart data={chart.data}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={chart.x} />
+        <XAxis dataKey={chart.x} {...xAxisProps} />
         <YAxis />
         <Tooltip />
         <Bar dataKey={chart.y} fill={colors[0]} radius={[6, 6, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
+}
+
+function getXAxisProps(chart: ChartPayload) {
+  const hasManyPoints = chart.data.length > 10;
+  return {
+    interval: hasManyPoints ? ("preserveStartEnd" as const) : 0,
+    minTickGap: chart.type === "line" || chart.type === "area" ? 18 : 12,
+    tick: { fontSize: 11 },
+  };
 }
 
 function hasActiveFilters(filters: DashboardFilters) {
@@ -1444,9 +1525,12 @@ function drawCanvasChart(
   height: number,
   colors: string[],
 ) {
-  const data = chart.data.slice(0, 8);
+  const data = chart.type === "line" || chart.type === "area" ? chart.data.slice(0, 24) : chart.data.slice(0, 10);
   const values = data.map((row) => Number(row[chart.y]) || 0);
+  const min = Math.min(...values, 0);
   const max = Math.max(...values, 1);
+  const span = Math.max(max - min, 1);
+  const valueToY = (value: number) => y + height - ((value - min) / span) * height;
 
   context.strokeStyle = "#cbd5e1";
   context.lineWidth = 1;
@@ -1462,7 +1546,7 @@ function drawCanvasChart(
     context.beginPath();
     data.forEach((_, index) => {
       const pointX = x + (index / Math.max(data.length - 1, 1)) * width;
-      const pointY = y + height - (values[index] / max) * height;
+      const pointY = valueToY(values[index]);
       if (index === 0) context.moveTo(pointX, pointY);
       else context.lineTo(pointX, pointY);
     });
@@ -1487,10 +1571,13 @@ function drawCanvasChart(
   }
 
   const barWidth = width / Math.max(data.length, 1) - 8;
+  const baseline = valueToY(0);
   values.forEach((value, index) => {
-    const barHeight = (value / max) * height;
+    const valueY = valueToY(value);
+    const barTop = Math.min(baseline, valueY);
+    const barHeight = Math.max(Math.abs(valueY - baseline), 2);
     context.fillStyle = colors[index % colors.length];
-    context.fillRect(x + index * (barWidth + 8), y + height - barHeight, Math.max(barWidth, 8), barHeight);
+    context.fillRect(x + index * (barWidth + 8), barTop, Math.max(barWidth, 8), barHeight);
   });
 }
 

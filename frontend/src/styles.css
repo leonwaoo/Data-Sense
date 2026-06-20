@@ -875,7 +875,10 @@ h2 {
   padding: 6px 10px;
 }
 
-.date-suggestion-list {
+.date-suggestion-list,
+.ingest-report-list,
+.score-breakdown-list,
+.outlier-list {
   background: #f8fafc;
   border: 1px solid #dbe5ef;
   border-radius: 8px;
@@ -884,12 +887,18 @@ h2 {
   padding: 12px;
 }
 
-.date-suggestion-list strong {
+.date-suggestion-list strong,
+.ingest-report-list strong,
+.score-breakdown-list strong,
+.outlier-list strong {
   color: #0f172a;
   font-size: 0.9rem;
 }
 
-.date-suggestion-list p {
+.date-suggestion-list p,
+.ingest-report-list p,
+.score-breakdown-list p,
+.outlier-list p {
   color: #475569;
   font-size: 0.88rem;
   margin: 0;

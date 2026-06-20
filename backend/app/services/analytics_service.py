@@ -5,6 +5,7 @@ import duckdb
 import pandas as pd
 
 from app.models import DatasetSession
+from app.services.date_utils import parse_common_dates
 
 SALES_CANDIDATES = [
     "valor_total",
@@ -51,7 +52,8 @@ METRIC_NOISE_TERMS = [
     "percentual",
     "taxa",
 ]
-NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento"]
+NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento", "ajuste", "abatimento"]
+NEGATIVE_ALLOWED_TERMS = ["lucro", "margem", "saldo"]
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 GROUP_CANDIDATES = [
     ("produto", ["produto", "item", "sku", "servico", "produto_servico"]),
@@ -162,9 +164,7 @@ def _ranking_response(dataset: DatasetSession, group_column: str, value_column: 
 
 def _monthly_response(dataset: DatasetSession, date_column: str, value_column: str) -> dict:
     df = dataset.dataframe.copy()
-    parsed_default = pd.to_datetime(df[date_column], errors="coerce")
-    parsed_dayfirst = pd.to_datetime(df[date_column], errors="coerce", dayfirst=True)
-    parsed_dates = parsed_dayfirst if parsed_dayfirst.notna().sum() > parsed_default.notna().sum() else parsed_default
+    parsed_dates = parse_common_dates(df[date_column])
     df = df.assign(_mes=parsed_dates.dt.to_period("M").astype(str))
     df = df[df["_mes"].ne("NaT")]
 
@@ -271,7 +271,11 @@ def _best_metric_column(df: pd.DataFrame, numeric_columns: list[str], candidates
     if scored_columns and scored_columns[0][0] > 0:
         return scored_columns[0][1]
 
-    filtered = [column for column in numeric_columns if not _looks_like_identifier(column) and not _is_metric_noise(column)]
+    filtered = [
+        column
+        for column in numeric_columns
+        if not _looks_like_identifier(column) and not _is_metric_noise(column) and not _is_adjustment_metric(column)
+    ]
     return (filtered or numeric_columns)[0] if numeric_columns else None
 
 
@@ -288,8 +292,8 @@ def _metric_score(df: pd.DataFrame, column: str, candidates: list[str], domain: 
         if candidate in normalized:
             score += max(10, 70 - index * 3)
 
-    if any(term in normalized for term in NEGATIVE_METRIC_TERMS):
-        score -= 90
+    if _is_adjustment_metric(column):
+        score -= 220
     if domain == "vendas" and any(term in normalized for term in ["compra", "custo", "despesa", "gasto"]):
         score -= 70
     if domain == "compras" and any(term in normalized for term in ["receita", "faturamento", "venda"]):
@@ -299,8 +303,10 @@ def _metric_score(df: pd.DataFrame, column: str, candidates: list[str], domain: 
     if series.empty:
         return -1000
     negative_ratio = float((series < 0).sum() / len(series))
-    if negative_ratio > 0 and not any(term in normalized for term in ["lucro", "margem", "saldo"]):
-        score -= 65 * negative_ratio
+    if negative_ratio > 0 and not any(term in normalized for term in NEGATIVE_ALLOWED_TERMS):
+        score -= 160 * negative_ratio
+    if negative_ratio >= 0.35 and not any(term in normalized for term in NEGATIVE_ALLOWED_TERMS):
+        score -= 120
 
     return score
 
@@ -349,6 +355,11 @@ def _looks_like_identifier(column: str) -> bool:
 def _is_metric_noise(column: str) -> bool:
     normalized = _normalize_text(column).replace(" ", "_")
     return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
+
+
+def _is_adjustment_metric(column: str) -> bool:
+    normalized = _normalize_text(column).replace(" ", "_")
+    return any(term in normalized for term in NEGATIVE_METRIC_TERMS)
 
 
 def _quote_identifier(column: str) -> str:

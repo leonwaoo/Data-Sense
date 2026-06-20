@@ -17,6 +17,7 @@ from reportlab.pdfgen import canvas
 from app.models import DatasetSession
 from app.services.dashboard_service import build_dashboard
 from app.services.chart_service import suggest_charts
+from app.services.date_utils import parse_common_dates
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
@@ -39,6 +40,7 @@ class ReportContext:
     insights: list[str]
     recommendations: list[str]
     charts: list[ReportChart]
+    dashboard_kpis: list[dict]
 
 
 def build_report_pdf(dataset: DatasetSession) -> bytes:
@@ -73,7 +75,8 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
 
 def build_report_png(dataset: DatasetSession) -> bytes:
     context = build_report_context(dataset)
-    image = Image.new("RGB", (1400, 2600), "#eef3f8")
+    canvas_height = 1900 + len(context.charts) * 380 + len(context.insights) * 42 + len(context.recommendations) * 42
+    image = Image.new("RGB", (1400, max(2600, canvas_height)), "#eef3f8")
     draw = ImageDraw.Draw(image)
     fonts = _load_fonts()
     x = 70
@@ -83,7 +86,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     draw.rounded_rectangle((x, y, x + max_width, y + 220), radius=10, fill="#ffffff", outline="#dbe5ef")
     draw.text((x + 28, y + 28), "DataSense", fill="#0f766e", font=fonts["label"])
     draw.text((x + 28, y + 60), "Relatorio Analitico", fill="#0f172a", font=fonts["title"])
-    draw.text((x + 28, y + 132), f"Arquivo: {context.file_name}", fill="#334155", font=fonts["body"])
+    draw.text((x + 28, y + 132), f"Arquivo: {_truncate(context.file_name, 72)}", fill="#334155", font=fonts["body"])
     draw.text((x + 28, y + 164), f"Gerado em: {context.generated_at}", fill="#64748b", font=fonts["small"])
     y += 250
 
@@ -96,10 +99,10 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     y = _png_section(draw, "Principais insights", context.insights, fonts, x, y, max_width)
     y = _png_section(draw, "Recomendacoes", context.recommendations, fonts, x, y, max_width)
 
-    for chart in context.charts[:2]:
+    for chart in context.charts:
         y = _png_chart(draw, chart, fonts, x, y, max_width)
 
-    cropped = image.crop((0, 0, 1400, min(2600, y + 70)))
+    cropped = image.crop((0, 0, 1400, min(image.height, y + 70)))
     output = BytesIO()
     cropped.save(output, format="PNG", optimize=True)
     return output.getvalue()
@@ -108,6 +111,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
 def build_report_context(dataset: DatasetSession) -> ReportContext:
     profile = build_profile(dataset)
     quality = build_quality_report(dataset)
+    dashboard = build_dashboard(dataset)
     charts = _build_report_charts(dataset, profile)
     insights = _build_insights(dataset, profile, quality, charts)
     recommendations = quality["recommendations"][:]
@@ -120,16 +124,26 @@ def build_report_context(dataset: DatasetSession) -> ReportContext:
         insights=insights,
         recommendations=recommendations,
         charts=charts,
+        dashboard_kpis=dashboard.get("kpis", []),
     )
 
 
 def _summary_items(context: ReportContext) -> list[str]:
     profile = context.profile
-    return [
+    items = [
         f"{profile['rows']} linhas e {profile['columns']} colunas analisadas.",
         f"{len(profile['numeric_columns'])} colunas numericas, {len(profile['categorical_columns'])} categoricas e {len(profile['datetime_columns'])} de data.",
         "Formato aceito e processado com perfil automatico, auditoria de qualidade e sugestoes de graficos.",
     ]
+    ingest_report = profile.get("ingest_report", {})
+    if ingest_report.get("header_row_number"):
+        items.append(
+            f"Cabecalho detectado na linha {ingest_report['header_row_number']}; "
+            f"{ingest_report.get('metadata_rows_skipped', 0)} linha(s) antes dele foram tratadas como metadado."
+        )
+    for warning in ingest_report.get("warnings", [])[:2]:
+        items.append(f"Sanidade de ingestao: {warning}")
+    return items
 
 
 def _date_suggestion_items(context: ReportContext) -> list[str]:
@@ -141,20 +155,43 @@ def _quality_items(context: ReportContext) -> list[str]:
     quality = context.quality
     empty_columns = quality["empty_columns"]
     outliers = quality.get("numeric_outliers", {})
-    return [
+    items = [
         f"Score de qualidade: {quality['score']}/100.",
         f"Valores ausentes: {quality['missing_total']}.",
         f"Linhas duplicadas: {quality['duplicate_rows']}.",
         f"Colunas vazias: {len(empty_columns)}.",
         f"Colunas com outliers numericos: {len(outliers)}.",
     ]
+    for item in quality.get("score_breakdown", []):
+        items.append(
+            f"{item['label']}: peso {item['weight']} pontos, perda {item['lost_points']} ponto(s). {item['detail']}"
+        )
+    for item in quality.get("numeric_outlier_details", [])[:4]:
+        items.append(
+            f"Outlier nomeado: {item['column']} linha {item['row_index']} com valor {_format_number(item['value'])}, "
+            f"{item['deviation_ratio']}x distante da media."
+        )
+    return items
 
 
 def _build_insights(dataset: DatasetSession, profile: dict, quality: dict, charts: list[ReportChart]) -> list[str]:
-    insights = [
-        f"O dataset possui {profile['rows']} registros prontos para analise exploratoria.",
-        _quality_score_sentence(quality["score"]),
-    ]
+    insights: list[str] = []
+
+    business_charts = [chart for chart in charts if chart.title != "Valores ausentes por coluna"] or charts
+    for chart in business_charts:
+        if chart.values:
+            best_index = max(range(len(chart.values)), key=lambda index: chart.values[index])
+            insights.append(
+                f"No grafico '{chart.title}', o maior valor aparece em {chart.labels[best_index]}: {_format_number(chart.values[best_index])}."
+            )
+            break
+
+    if profile["numeric_columns"]:
+        first_numeric = profile["numeric_columns"][0]
+        total = pd.to_numeric(dataset.dataframe[first_numeric], errors="coerce").sum()
+        insights.append(f"A coluna numerica {first_numeric} soma {_format_number(float(total))}.")
+
+    insights.append(_quality_score_sentence(quality["score"]))
 
     missing_by_column = quality.get("missing_by_column", {})
     if missing_by_column:
@@ -168,18 +205,6 @@ def _build_insights(dataset: DatasetSession, profile: dict, quality: dict, chart
         insights.append(f"Foram encontradas {quality['duplicate_rows']} linhas duplicadas que merecem validacao.")
     else:
         insights.append("Nao foram encontradas linhas duplicadas.")
-
-    business_charts = [chart for chart in charts if chart.title != "Valores ausentes por coluna"] or charts
-    for chart in business_charts:
-        if chart.values:
-            best_index = max(range(len(chart.values)), key=lambda index: chart.values[index])
-            insights.append(f"No grafico '{chart.title}', o maior valor aparece em {chart.labels[best_index]}: {_format_number(chart.values[best_index])}.")
-            break
-
-    if len(insights) < 5 and profile["numeric_columns"]:
-        first_numeric = profile["numeric_columns"][0]
-        total = pd.to_numeric(dataset.dataframe[first_numeric], errors="coerce").sum()
-        insights.append(f"A coluna numerica {first_numeric} soma {_format_number(float(total))}.")
 
     return insights[:6]
 
@@ -238,7 +263,9 @@ def _chart_from_dashboard_payload(payload: dict) -> ReportChart | None:
 
     labels: list[str] = []
     values: list[float] = []
-    for row in data[:8]:
+    chart_type = "line" if payload.get("type") in {"line", "area"} else "bar"
+    limited_data = data[:24] if chart_type == "line" else data[:10]
+    for row in limited_data:
         if x_column not in row or y_column not in row:
             continue
         labels.append(str(row[x_column]))
@@ -248,8 +275,8 @@ def _chart_from_dashboard_payload(payload: dict) -> ReportChart | None:
         return None
 
     return ReportChart(
-        title=str(payload.get("title") or "Grafico automatico"),
-        chart_type="line" if payload.get("type") == "line" else "bar",
+        title=_truncate(str(payload.get("title") or "Grafico automatico"), 72),
+        chart_type=chart_type,
         labels=labels,
         values=values,
         note=str(payload.get("insight") or payload.get("subtitle") or "Grafico gerado automaticamente pelo DataSense."),
@@ -265,9 +292,7 @@ def _chart_from_suggestion(dataset: DatasetSession, suggestion: dict) -> ReportC
         return None
 
     if suggestion["type"] == "line":
-        dates = pd.to_datetime(df[x_column], errors="coerce")
-        if dates.notna().mean() < 0.5:
-            dates = pd.to_datetime(df[x_column], errors="coerce", dayfirst=True)
+        dates = parse_common_dates(df[x_column])
         values = pd.to_numeric(df[y_column], errors="coerce")
         result = (
             pd.DataFrame({"periodo": dates.dt.to_period("M").astype(str), "valor": values})
@@ -280,10 +305,10 @@ def _chart_from_suggestion(dataset: DatasetSession, suggestion: dict) -> ReportC
         if result.empty:
             return None
         return ReportChart(
-            title=str(suggestion["title"]),
+        title=_truncate(str(suggestion["title"]), 72),
             chart_type="line",
-            labels=result["periodo"].astype(str).tolist()[:8],
-            values=[float(value) for value in result["valor"].tolist()[:8]],
+            labels=result["periodo"].astype(str).tolist()[:24],
+            values=[float(value) for value in result["valor"].tolist()[:24]],
             note=str(suggestion["reason"]),
         )
 
@@ -295,12 +320,12 @@ def _chart_from_suggestion(dataset: DatasetSession, suggestion: dict) -> ReportC
             .groupby("grupo", as_index=False)["valor"]
             .sum()
             .sort_values("valor", ascending=False)
-            .head(6)
+            .head(10)
         )
         if result.empty:
             return None
         return ReportChart(
-            title=str(suggestion["title"]),
+            title=_truncate(str(suggestion["title"]), 72),
             chart_type="bar",
             labels=result["grupo"].astype(str).tolist(),
             values=[float(value) for value in result["valor"].tolist()],
@@ -319,7 +344,7 @@ def _pdf_header(pdf: canvas.Canvas, context: ReportContext, margin: float, y: fl
     pdf.drawString(margin, y - 26, "Relatorio Analitico")
     pdf.setFont("Helvetica", 10)
     pdf.setFillColor(colors.HexColor("#475569"))
-    pdf.drawString(margin, y - 46, f"Arquivo: {context.file_name}")
+    pdf.drawString(margin, y - 46, f"Arquivo: {_truncate(context.file_name, 76)}")
     pdf.drawRightString(width - margin, y - 46, f"Gerado em: {context.generated_at}")
     pdf.setStrokeColor(colors.HexColor("#dbe5ef"))
     pdf.line(margin, y - 62, width - margin, y - 62)
@@ -327,14 +352,7 @@ def _pdf_header(pdf: canvas.Canvas, context: ReportContext, margin: float, y: fl
 
 
 def _pdf_kpi_cards(pdf: canvas.Canvas, context: ReportContext, margin: float, y: float, width: float) -> float:
-    profile = context.profile
-    quality = context.quality
-    cards = [
-        ("Linhas", str(profile["rows"])),
-        ("Colunas", str(profile["columns"])),
-        ("Qualidade", f"{quality['score']}/100"),
-        ("Nulos", str(quality["missing_total"])),
-    ]
+    cards = _report_kpi_cards(context)
     gap = 8
     card_width = (width - 2 * margin - 3 * gap) / 4
     for index, (label, value) in enumerate(cards):
@@ -385,7 +403,7 @@ def _pdf_chart(pdf: canvas.Canvas, chart: ReportChart, margin: float, y: float, 
 
     pdf.setFillColor(colors.HexColor("#0f172a"))
     pdf.setFont("Helvetica-Bold", 13)
-    pdf.drawString(margin + 10, y - 16, chart.title)
+    pdf.drawString(margin + 10, y - 16, _truncate(chart.title, 86))
     pdf.setFont("Helvetica", 8.5)
     pdf.setFillColor(colors.HexColor("#64748b"))
     pdf.drawString(margin + 10, y - 29, _truncate(chart.note, 104))
@@ -429,7 +447,7 @@ def _pdf_bar_chart(pdf: canvas.Canvas, chart: ReportChart, x: float, y: float, w
         pdf.rect(bx, bar_bottom, bar_width, bar_height, fill=1, stroke=0)
         pdf.setFillColor(colors.HexColor("#334155"))
         pdf.setFont("Helvetica", 7)
-        pdf.drawCentredString(bx + bar_width / 2, y - 10, _truncate(chart.labels[index], 14))
+        pdf.drawCentredString(bx + bar_width / 2, y - 10, _truncate(chart.labels[index], 12))
         pdf.drawCentredString(bx + bar_width / 2, max(baseline, value_y) + 4, _format_number(value))
         pdf.setFillColor(colors.HexColor("#0f766e"))
 
@@ -454,12 +472,14 @@ def _pdf_line_chart(pdf: canvas.Canvas, chart: ReportChart, x: float, y: float, 
     for start, end in zip(points, points[1:]):
         pdf.line(start[0], start[1], end[0], end[1])
     pdf.setFillColor(colors.HexColor("#0f766e"))
+    label_step = _label_step(len(points), 8)
     for index, (px, py) in enumerate(points):
         pdf.circle(px, py, 2.5, fill=1, stroke=0)
-        pdf.setFillColor(colors.HexColor("#334155"))
-        pdf.setFont("Helvetica", 7)
-        pdf.drawCentredString(px, y - 10, _truncate(chart.labels[index], 12))
-        pdf.setFillColor(colors.HexColor("#0f766e"))
+        if index == 0 or index == len(points) - 1 or index % label_step == 0:
+            pdf.setFillColor(colors.HexColor("#334155"))
+            pdf.setFont("Helvetica", 7)
+            pdf.drawCentredString(px, y - 10, _truncate(chart.labels[index], 10))
+            pdf.setFillColor(colors.HexColor("#0f766e"))
 
 
 def _pdf_empty_chart_message(pdf: canvas.Canvas, x: float, y: float, width: float, height: float) -> None:
@@ -475,20 +495,35 @@ def _pdf_footer(pdf: canvas.Canvas, width: float) -> None:
 
 
 def _png_kpi_cards(draw: ImageDraw.ImageDraw, context: ReportContext, fonts: dict, x: int, y: int) -> None:
-    profile = context.profile
-    quality = context.quality
-    cards = [
-        ("Linhas", str(profile["rows"])),
-        ("Colunas", str(profile["columns"])),
-        ("Qualidade", f"{quality['score']}/100"),
-        ("Nulos", str(quality["missing_total"])),
-    ]
+    cards = _report_kpi_cards(context)
     width = 292
     for index, (label, value) in enumerate(cards):
         left = x + index * (width + 30)
         draw.rounded_rectangle((left, y, left + width, y + 108), radius=10, fill="#ffffff", outline="#dbe5ef")
         draw.text((left + 22, y + 20), label, fill="#64748b", font=fonts["small"])
         draw.text((left + 22, y + 50), value, fill="#0f172a", font=fonts["subtitle"])
+
+
+def _report_kpi_cards(context: ReportContext) -> list[tuple[str, str]]:
+    technical_labels = {"Registros", "Score de qualidade", "Valores nulos", "Duplicatas"}
+    dashboard_cards = [
+        (str(kpi.get("label", "")), str(kpi.get("value", "")))
+        for kpi in context.dashboard_kpis
+        if kpi.get("label") and kpi.get("value")
+    ]
+    business = [card for card in dashboard_cards if card[0] not in technical_labels]
+    technical = [card for card in dashboard_cards if card[0] in technical_labels]
+    cards = (business + technical)[:4]
+    if len(cards) >= 4:
+        return cards
+
+    fallback = [
+        ("Linhas", str(context.profile["rows"])),
+        ("Colunas", str(context.profile["columns"])),
+        ("Qualidade", f"{context.quality['score']}/100"),
+        ("Nulos", str(context.quality["missing_total"])),
+    ]
+    return (cards + fallback)[:4]
 
 
 def _png_section(draw: ImageDraw.ImageDraw, title: str, items: list[str], fonts: dict, x: int, y: int, max_width: int) -> int:
@@ -509,8 +544,8 @@ def _png_section(draw: ImageDraw.ImageDraw, title: str, items: list[str], fonts:
 def _png_chart(draw: ImageDraw.ImageDraw, chart: ReportChart, fonts: dict, x: int, y: int, max_width: int) -> int:
     height = 330
     draw.rounded_rectangle((x, y, x + max_width, y + height), radius=10, fill="#ffffff", outline="#dbe5ef")
-    draw.text((x + 24, y + 18), chart.title, fill="#0f172a", font=fonts["section"])
-    draw.text((x + 24, y + 50), chart.note, fill="#64748b", font=fonts["small"])
+    draw.text((x + 24, y + 18), _truncate(chart.title, 72), fill="#0f172a", font=fonts["section"])
+    draw.text((x + 24, y + 50), _truncate(chart.note, 110), fill="#64748b", font=fonts["small"])
     chart_box = (x + 60, y + 104, x + max_width - 50, y + height - 54)
     _png_axes(draw, chart_box)
     if chart.chart_type == "line":
@@ -567,9 +602,11 @@ def _png_line_chart(draw: ImageDraw.ImageDraw, chart: ReportChart, box: tuple[in
         points.append((px, py))
     if len(points) > 1:
         draw.line(points, fill="#0f766e", width=5)
+    label_step = _label_step(len(points), 8)
     for index, point in enumerate(points):
         draw.ellipse((point[0] - 6, point[1] - 6, point[0] + 6, point[1] + 6), fill="#0f766e")
-        draw.text((point[0] - 24, bottom + 10), _truncate(chart.labels[index], 10), fill="#334155", font=fonts["tiny"])
+        if index == 0 or index == len(points) - 1 or index % label_step == 0:
+            draw.text((point[0] - 24, bottom + 10), _truncate(chart.labels[index], 10), fill="#334155", font=fonts["tiny"])
 
 
 def _load_fonts() -> dict:
@@ -623,6 +660,10 @@ def _safe_chart_values(values: list[float]) -> list[float]:
     return [float(value) for value in values if pd.notna(value)]
 
 
+def _label_step(length: int, target: int) -> int:
+    return max(1, ceil(length / max(target, 1)))
+
+
 def _format_number(value: float) -> str:
     if abs(value) >= 1000:
         return f"{value:,.0f}".replace(",", ".")
@@ -632,5 +673,11 @@ def _format_number(value: float) -> str:
 
 
 def _truncate(value: str, limit: int) -> str:
-    text = str(value)
+    text = _clean_display_text(str(value))
     return text if len(text) <= limit else f"{text[: limit - 1]}..."
+
+
+def _clean_display_text(value: str) -> str:
+    text = "".join(character for character in str(value) if character.isprintable())
+    text = " ".join(text.split())
+    return text

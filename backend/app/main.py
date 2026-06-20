@@ -8,6 +8,7 @@ from app.services.ai_quality_service import build_quality_audit
 from app.services.chart_service import suggest_charts
 from app.services.dashboard_service import build_dashboard
 from app.services.dataset_service import get_dataset, load_dataset, supported_formats
+from app.services.managerial_analysis_service import build_managerial_analysis
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 from app.services.report_service import build_report_pdf, build_report_png
@@ -64,6 +65,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict:
         "profile": build_profile(dataset),
         "preview": dataset.preview(),
         "quality": build_quality_report(dataset),
+        "managerial_analysis": build_managerial_analysis(dataset),
     }
 
 
@@ -85,6 +87,11 @@ def dataset_quality(dataset_id: str) -> dict:
 @app.get("/datasets/{dataset_id}/quality/audit")
 def dataset_quality_audit(dataset_id: str) -> dict:
     return build_quality_audit(get_dataset(dataset_id))
+
+
+@app.get("/datasets/{dataset_id}/managerial-analysis")
+def dataset_managerial_analysis(dataset_id: str) -> dict:
+    return build_managerial_analysis(get_dataset(dataset_id))
 
 
 @app.post("/datasets/{dataset_id}/ask")

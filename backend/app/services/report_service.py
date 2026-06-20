@@ -305,7 +305,7 @@ def _chart_from_suggestion(dataset: DatasetSession, suggestion: dict) -> ReportC
         if result.empty:
             return None
         return ReportChart(
-        title=_truncate(str(suggestion["title"]), 72),
+            title=_truncate(str(suggestion["title"]), 72),
             chart_type="line",
             labels=result["periodo"].astype(str).tolist()[:24],
             values=[float(value) for value in result["valor"].tolist()[:24]],

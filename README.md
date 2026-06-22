@@ -53,6 +53,7 @@ O sistema atuara como um assistente para analise de dados:
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
 - Renderiza graficos reais no relatorio, com mensagem clara quando nao ha dados suficientes para desenhar uma visualizacao.
 - Exporta o dashboard personalizado em PDF via impressao e PNG gerado no navegador.
+- Exporta pacote Power BI com dados tratados, comparativo mensal, insights gerenciais, graficos sugeridos e metadados.
 - Mantem historico local das ultimas analises carregadas.
 
 ## Documentacao
@@ -61,6 +62,7 @@ O sistema atuara como um assistente para analise de dados:
 - [Roadmap](docs/02-roadmap.md)
 - [Registro de decisoes](docs/03-registro-de-decisoes.md)
 - [Definicao tecnica do MVP](docs/04-definicao-tecnica-mvp.md)
+- [Pacote Power BI](docs/05-pacote-power-bi.md)
 
 ## Estrutura inicial
 

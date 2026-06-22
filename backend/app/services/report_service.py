@@ -18,6 +18,7 @@ from app.models import DatasetSession
 from app.services.dashboard_service import build_dashboard
 from app.services.chart_service import suggest_charts
 from app.services.date_utils import parse_common_dates
+from app.services.managerial_analysis_service import build_managerial_analysis
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
@@ -37,6 +38,7 @@ class ReportContext:
     generated_at: str
     profile: dict
     quality: dict
+    managerial_analysis: dict
     insights: list[str]
     recommendations: list[str]
     charts: list[ReportChart]
@@ -53,6 +55,10 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
 
     y = _pdf_header(pdf, context, margin, y, width)
     y = _pdf_kpi_cards(pdf, context, margin, y, width)
+    y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Diagnostico de variacao", _managerial_variation_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Insights gerenciais", _managerial_insight_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Resumo do dataset", _summary_items(context), margin, y, width, height)
     if context.profile.get("date_conversion_suggestions"):
         y = _pdf_section(pdf, "Sugestoes de conversao de datas", _date_suggestion_items(context), margin, y, width, height)
@@ -75,7 +81,22 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
 
 def build_report_png(dataset: DatasetSession) -> bytes:
     context = build_report_context(dataset)
-    canvas_height = 1900 + len(context.charts) * 380 + len(context.insights) * 42 + len(context.recommendations) * 42
+    managerial_count = sum(
+        len(items)
+        for items in [
+            _managerial_summary_items(context),
+            _managerial_variation_items(context),
+            _managerial_insight_items(context),
+            _managerial_action_items(context),
+        ]
+    )
+    canvas_height = (
+        2100
+        + managerial_count * 58
+        + len(context.charts) * 380
+        + len(context.insights) * 42
+        + len(context.recommendations) * 42
+    )
     image = Image.new("RGB", (1400, max(2600, canvas_height)), "#eef3f8")
     draw = ImageDraw.Draw(image)
     fonts = _load_fonts()
@@ -92,6 +113,10 @@ def build_report_png(dataset: DatasetSession) -> bytes:
 
     _png_kpi_cards(draw, context, fonts, x, y)
     y += 150
+    y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Diagnostico de variacao", _managerial_variation_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Insights gerenciais", _managerial_insight_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Resumo do dataset", _summary_items(context), fonts, x, y, max_width)
     if context.profile.get("date_conversion_suggestions"):
         y = _png_section(draw, "Sugestoes de conversao de datas", _date_suggestion_items(context), fonts, x, y, max_width)
@@ -111,6 +136,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
 def build_report_context(dataset: DatasetSession) -> ReportContext:
     profile = build_profile(dataset)
     quality = build_quality_report(dataset)
+    managerial_analysis = build_managerial_analysis(dataset)
     dashboard = build_dashboard(dataset)
     charts = _build_report_charts(dataset, profile)
     insights = _build_insights(dataset, profile, quality, charts)
@@ -121,10 +147,111 @@ def build_report_context(dataset: DatasetSession) -> ReportContext:
         generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
         profile=profile,
         quality=quality,
+        managerial_analysis=managerial_analysis,
         insights=insights,
         recommendations=recommendations,
         charts=charts,
         dashboard_kpis=dashboard.get("kpis", []),
+    )
+
+
+def _managerial_summary_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    summary = [str(item) for item in analysis.get("summary", []) if item]
+    domain = (analysis.get("context") or {}).get("domain") or {}
+    metric_map = (analysis.get("context") or {}).get("metric_map") or {}
+    primary_metric = metric_map.get("primary_metric")
+    confidence = domain.get("confidence")
+    domain_label = domain.get("label")
+
+    items = []
+    if domain_label:
+        confidence_text = f"{int(float(confidence) * 100)}%" if isinstance(confidence, (int, float)) else "n/d"
+        items.append(f"Tipo de analise detectado: {domain_label} com confianca {confidence_text}.")
+    if primary_metric:
+        items.append(f"Metrica principal da leitura gerencial: {primary_metric}.")
+    items.extend(summary[:4])
+    return items or ["Nao houve evidencia suficiente para gerar resumo executivo confiavel."]
+
+
+def _managerial_variation_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    variations = analysis.get("variations") or {}
+    context_payload = analysis.get("context") or {}
+    metric_map = context_payload.get("metric_map") or {}
+    time_payload = context_payload.get("time") or {}
+    dimensions = context_payload.get("dimensions") or []
+
+    items = []
+    if time_payload.get("label"):
+        items.append(f"Tempo usado na analise: {time_payload['label']}.")
+    if metric_map.get("support_metrics"):
+        support = ", ".join(f"{key}: {value}" for key, value in metric_map["support_metrics"].items())
+        items.append(f"Metricas de apoio usadas como drivers: {support}.")
+    if dimensions:
+        dimension_names = ", ".join(str(item.get("column")) for item in dimensions if item.get("column"))
+        if dimension_names:
+            items.append(f"Dimensoes usadas para localizar onde mudou: {dimension_names}.")
+
+    latest = variations.get("latest")
+    increase = variations.get("largest_increase")
+    drop = variations.get("largest_drop")
+    trend = variations.get("trend") or {}
+    if latest:
+        items.append(_movement_sentence("Movimento recente", latest))
+    if increase:
+        items.append(_movement_sentence("Maior alta", increase))
+    if drop:
+        items.append(_movement_sentence("Maior queda", drop))
+    if trend:
+        items.append(
+            f"Tendencia dos ultimos periodos: {trend.get('direction', 'indefinida')} "
+            f"({_format_signed_number(trend.get('change'))}; {_format_pct(trend.get('change_pct'))})."
+        )
+    return items or ["Nao ha variacao temporal suficiente para diagnostico gerencial."]
+
+
+def _managerial_insight_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    insights = analysis.get("insights") or []
+    items = []
+    for insight in insights[:4]:
+        title = insight.get("title") or "Insight gerencial"
+        how_much = insight.get("how_much") or ""
+        where = insight.get("where") or ""
+        impact = insight.get("managerial_impact") or ""
+        recommendation = insight.get("recommendation") or ""
+        confidence = insight.get("confidence") or "n/d"
+        sentence = f"{title}: {how_much}"
+        if where:
+            sentence += f" Onde mudou: {where}"
+        if impact:
+            sentence += f" Impacto: {impact}"
+        if recommendation:
+            sentence += f" Recomendacao: {recommendation}"
+        sentence += f" Confianca: {confidence}."
+        items.append(sentence)
+    return items or ["Sem insights gerenciais suficientes para exportacao."]
+
+
+def _managerial_action_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    alerts = [f"Alerta: {item}" for item in (analysis.get("alerts") or [])[:4]]
+    recommendations = [f"Acao: {item}" for item in (analysis.get("recommendations") or [])[:4]]
+    questions = [f"Pergunta sugerida: {item}" for item in (analysis.get("suggested_questions") or [])[:3]]
+    return alerts + recommendations + questions or ["Nenhum alerta gerencial adicional foi identificado."]
+
+
+def _movement_sentence(label: str, movement: dict) -> str:
+    period = movement.get("period")
+    value = _format_number(movement.get("value"))
+    variation = _format_signed_number(movement.get("variation"))
+    variation_pct = _format_pct(movement.get("variation_pct"))
+    historical_mean = _format_number(movement.get("historical_mean"))
+    z_score = _format_number(movement.get("z_score"))
+    return (
+        f"{label}: {period} com valor {value}, variacao {variation} ({variation_pct}), "
+        f"media historica {historical_mean} e z-score {z_score}."
     )
 
 
@@ -664,12 +791,42 @@ def _label_step(length: int, target: int) -> int:
     return max(1, ceil(length / max(target, 1)))
 
 
-def _format_number(value: float) -> str:
-    if abs(value) >= 1000:
-        return f"{value:,.0f}".replace(",", ".")
-    if value == int(value):
-        return str(int(value))
-    return f"{value:.2f}".replace(".", ",")
+def _format_number(value: object) -> str:
+    try:
+        if pd.isna(value):
+            return "n/d"
+    except (TypeError, ValueError):
+        pass
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return "n/d"
+    if abs(parsed) >= 1000:
+        return f"{parsed:,.0f}".replace(",", ".")
+    if parsed == int(parsed):
+        return str(int(parsed))
+    return f"{parsed:.2f}".replace(".", ",")
+
+
+def _format_signed_number(value: object) -> str:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return "n/d"
+    sign = "+" if parsed >= 0 else "-"
+    return f"{sign}{_format_number(abs(parsed))}"
+
+
+def _format_pct(value: object) -> str:
+    try:
+        if pd.isna(value):
+            return "n/d"
+    except (TypeError, ValueError):
+        pass
+    try:
+        return f"{float(value):.1%}".replace(".", ",")
+    except (TypeError, ValueError):
+        return "n/d"
 
 
 def _truncate(value: str, limit: int) -> str:

@@ -90,7 +90,7 @@ def build_managerial_analysis(dataset: DatasetSession) -> dict:
     domain = _detect_analysis_domain(profile["column_names"])
     metric_map = _map_metrics(df, profile, domain)
     time_context = _build_time_context(df, profile)
-    dimensions = _select_dimensions(profile["column_names"], domain)
+    dimensions = _select_dimensions(profile, domain)
 
     context = {
         "domain": domain,
@@ -461,13 +461,15 @@ def _month_number(value: Any) -> float | None:
     return None
 
 
-def _select_dimensions(column_names: list[str], domain: dict) -> list[dict]:
+def _select_dimensions(profile: dict, domain: dict) -> list[dict]:
     rule = _domain_rule(domain["type"])
+    column_names = profile["column_names"]
+    metric_like_columns = set(profile.get("numeric_columns", [])) | set(profile.get("datetime_columns", []))
     dimensions = []
     used = set()
     for term in rule.get("dimensions", []):
         column = _first_matching(column_names, [term])
-        if column and column not in used:
+        if column and column not in used and column not in metric_like_columns:
             dimensions.append({"label": term, "column": column})
             used.add(column)
     return dimensions[:4]

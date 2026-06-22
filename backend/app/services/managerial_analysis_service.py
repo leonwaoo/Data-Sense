@@ -116,6 +116,7 @@ def build_managerial_analysis(dataset: DatasetSession) -> dict:
         "kpis": diagnostic["kpis"],
         "insights": diagnostic["insights"],
         "variations": diagnostic["variations"],
+        "monthly_comparisons": diagnostic["monthly_comparisons"],
         "driver_evidence": diagnostic["driver_evidence"],
         "alerts": diagnostic["alerts"],
         "recommendations": diagnostic["recommendations"],
@@ -187,6 +188,7 @@ def _build_variation_diagnostic(
     summary = _executive_summary(period_metrics, primary_metric, domain, focus, latest, driver_evidence)
     alerts = _alerts(abnormal_periods, focus, metric_map, period_metrics)
     recommendations = _recommendations(domain["type"], focus, primary_metric, driver_evidence, abnormal_periods)
+    monthly_comparisons = _monthly_comparisons(period_metrics, metric_map, domain)
 
     return {
         "summary": summary,
@@ -199,6 +201,7 @@ def _build_variation_diagnostic(
             "abnormal_periods": [_movement_payload(row) for _, row in abnormal_periods.head(5).iterrows()],
             "trend": _trend_payload(period_metrics),
         },
+        "monthly_comparisons": monthly_comparisons,
         "driver_evidence": driver_evidence,
         "alerts": alerts,
         "recommendations": recommendations,
@@ -211,6 +214,7 @@ def _build_variation_diagnostic(
                 "drop": _movement_payload(largest_drop),
             },
             "driver_evidence": driver_evidence,
+            "monthly_comparisons": monthly_comparisons[-12:],
             "abnormal_periods": [_movement_payload(row) for _, row in abnormal_periods.head(8).iterrows()],
             "limitations": [],
         },
@@ -231,6 +235,129 @@ def _period_metrics(prepared: pd.DataFrame, metric_map: dict) -> pd.DataFrame:
         .reset_index(drop=True)
     )
     return result
+
+
+def _monthly_comparisons(period_metrics: pd.DataFrame, metric_map: dict, domain: dict) -> list[dict]:
+    comparisons = []
+    for _, row in period_metrics.tail(18).iterrows():
+        value = _safe_float(row.get("valor"))
+        variation = _safe_float(row.get("variacao"))
+        variation_pct = _safe_float(row.get("variacao_pct"))
+        previous_value = None if value is None or variation is None else value - variation
+        drivers = _monthly_driver_changes(period_metrics, metric_map, row)
+        main_driver = drivers[0] if drivers else None
+        status = _monthly_status(variation, variation_pct, _safe_float(row.get("z_score")))
+        comparisons.append(
+            {
+                "period": str(row.get("periodo")),
+                "value": _round_or_none(value),
+                "previous_value": _round_or_none(previous_value),
+                "variation": _round_or_none(variation),
+                "variation_pct": _round_or_none(variation_pct),
+                "historical_mean": _round_or_none(row.get("media_historica")),
+                "z_score": _round_or_none(row.get("z_score")),
+                "status": status["label"],
+                "severity": status["tone"],
+                "managerial_reading": _monthly_reading(domain["type"], status["label"], variation, variation_pct, main_driver),
+                "main_driver": main_driver,
+                "drivers": drivers[:4],
+            }
+        )
+    return comparisons
+
+
+def _monthly_driver_changes(period_metrics: pd.DataFrame, metric_map: dict, movement: pd.Series) -> list[dict]:
+    drivers = []
+    focus_index = int(movement.name) if isinstance(movement.name, int) else period_metrics.index[period_metrics["periodo"] == movement["periodo"]][0]
+    previous_row = period_metrics.iloc[focus_index - 1] if focus_index > 0 else None
+    if previous_row is None:
+        return drivers
+
+    for group_name, column in metric_map["support_metrics"].items():
+        if group_name not in period_metrics.columns:
+            continue
+        current_value = _safe_float(movement.get(group_name))
+        previous_value = _safe_float(previous_row.get(group_name))
+        if current_value is None or previous_value is None:
+            continue
+        variation = current_value - previous_value
+        variation_pct = variation / abs(previous_value) if previous_value else None
+        drivers.append(
+            {
+                "driver": group_name,
+                "column": column,
+                "current_value": _round_or_none(current_value),
+                "previous_value": _round_or_none(previous_value),
+                "variation": _round_or_none(variation),
+                "variation_pct": _round_or_none(variation_pct),
+                "reading": f"{column} variou {_format_signed_number(variation)} ({_format_pct(variation_pct)}).",
+            }
+        )
+
+    drivers.sort(
+        key=lambda item: max(abs(item.get("variation_pct") or 0), abs(item.get("variation") or 0) / 1000),
+        reverse=True,
+    )
+    return drivers
+
+
+def _monthly_status(variation: float | None, variation_pct: float | None, z_score: float | None) -> dict:
+    if variation is None:
+        return {"label": "Base inicial", "tone": "neutral"}
+    if z_score is not None and abs(z_score) >= 2:
+        return {"label": "Fora do padrao", "tone": "warning"}
+    severity = _movement_severity(variation, variation_pct)
+    if severity["tone"] == "danger":
+        return {"label": "Movimento critico", "tone": "danger"}
+    if severity["tone"] == "warning":
+        return {"label": "Movimento relevante", "tone": "warning"}
+    if variation > 0:
+        return {"label": "Alta mensal", "tone": "info"}
+    if variation < 0:
+        return {"label": "Queda mensal", "tone": "info"}
+    return {"label": "Estavel", "tone": "neutral"}
+
+
+def _monthly_reading(
+    domain_type: str,
+    status: str,
+    variation: float | None,
+    variation_pct: float | None,
+    main_driver: dict | None,
+) -> str:
+    if variation is None:
+        return "Mes base para comparacoes posteriores."
+
+    direction = "alta" if variation >= 0 else "queda"
+    driver_text = f" Variavel de apoio com maior mudanca: {main_driver['reading']}" if main_driver else ""
+    if domain_type == "estoque_operacao":
+        if direction == "queda":
+            return (
+                f"{status}: estoque em queda de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
+                "avaliar consumo, saidas, transferencias e reposicao."
+                f"{driver_text}"
+            )
+        return (
+            f"{status}: estoque em alta de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
+            "avaliar entradas, producao, menor consumo e risco de capital parado."
+            f"{driver_text}"
+        )
+    if domain_type == "vendas":
+        return (
+            f"{status}: receita/valor em {direction} de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
+            "validar mix, cliente, produto e campanha do mes."
+            f"{driver_text}"
+        )
+    if domain_type == "compras":
+        return (
+            f"{status}: compras/custos em {direction} de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
+            "validar pedidos, fornecedor e abastecimento."
+            f"{driver_text}"
+        )
+    return (
+        f"{status}: metrica em {direction} de {_format_signed_number(variation)} ({_format_pct(variation_pct)})."
+        f"{driver_text}"
+    )
 
 
 def _managerial_insight(
@@ -507,6 +634,7 @@ def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) ->
             }
         ],
         "variations": {},
+        "monthly_comparisons": [],
         "driver_evidence": [],
         "alerts": limitations,
         "recommendations": ["Adicionar ou confirmar coluna de periodo para habilitar diagnostico de alta, queda e tendencia."],
@@ -536,6 +664,7 @@ def _empty_diagnostic(metric_map: dict, domain: dict, reason: str) -> dict:
         "kpis": [],
         "insights": [insight],
         "variations": {},
+        "monthly_comparisons": [],
         "driver_evidence": [],
         "alerts": [reason],
         "recommendations": ["Validar periodo e granularidade do arquivo."],

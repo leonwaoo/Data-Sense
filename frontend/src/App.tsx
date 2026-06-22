@@ -163,6 +163,31 @@ type ManagerialInsight = {
   evidence: string[];
 };
 
+type ManagerialDriver = {
+  driver: string;
+  column: string;
+  current_value: number | null;
+  previous_value: number | null;
+  variation: number | null;
+  variation_pct: number | null;
+  reading: string;
+};
+
+type ManagerialMonthlyComparison = {
+  period: string;
+  value: number | null;
+  previous_value: number | null;
+  variation: number | null;
+  variation_pct: number | null;
+  historical_mean: number | null;
+  z_score: number | null;
+  status: string;
+  severity: "danger" | "warning" | "info" | "neutral";
+  managerial_reading: string;
+  main_driver: ManagerialDriver | null;
+  drivers: ManagerialDriver[];
+};
+
 type ManagerialAnalysis = {
   mode: string;
   title: string;
@@ -189,6 +214,7 @@ type ManagerialAnalysis = {
   };
   kpis: { label: string; value: string; detail: string }[];
   insights: ManagerialInsight[];
+  monthly_comparisons?: ManagerialMonthlyComparison[];
   alerts: string[];
   recommendations: string[];
   suggested_questions: string[];
@@ -344,6 +370,9 @@ const sampleFiles = [
   { label: "Estoque TSV", fileName: "estoque_financeiro_demo.tsv", href: "/samples/estoque_financeiro_demo.tsv" },
 ];
 
+const numberFormatter = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+const percentFormatter = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1, style: "percent" });
+
 export function App() {
   const [dataset, setDataset] = useState<UploadResponse | null>(null);
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
@@ -363,7 +392,7 @@ export function App() {
   const [isQualityAuditLoading, setIsQualityAuditLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | "powerbi" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -578,6 +607,35 @@ export function App() {
     }
   }
 
+  async function handleDownloadPowerBi() {
+    if (!dataset) return;
+
+    setExportingFormat("powerbi");
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/powerbi.zip`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.detail || "Nao foi possivel gerar o pacote Power BI.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `datasense-powerbi-${dataset.file_name.replace(/\.[^.]+$/, "")}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (powerBiError) {
+      setError(powerBiError instanceof Error ? powerBiError.message : "Erro inesperado ao gerar pacote Power BI.");
+    } finally {
+      setExportingFormat(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="topbar">
@@ -659,7 +717,7 @@ export function App() {
           <div>
             <Download size={18} />
             <strong>Relatorio exportavel</strong>
-            <span>Resumo, qualidade, insights, graficos e recomendacoes</span>
+            <span>Resumo, qualidade, insights, graficos, recomendacoes e Power BI</span>
           </div>
           <div className="report-actions">
             <button disabled={!!exportingFormat} onClick={() => void handleDownloadReport("pdf")} type="button">
@@ -669,6 +727,10 @@ export function App() {
             <button disabled={!!exportingFormat} onClick={() => void handleDownloadReport("png")} type="button">
               <Download size={16} />
               {exportingFormat === "png" ? "Gerando PNG..." : "Baixar PNG"}
+            </button>
+            <button disabled={!!exportingFormat} onClick={() => void handleDownloadPowerBi()} type="button">
+              <FileSpreadsheet size={16} />
+              {exportingFormat === "powerbi" ? "Gerando Power BI..." : "Power BI"}
             </button>
           </div>
         </section>
@@ -856,9 +918,23 @@ function MetricCard({ icon, label, value }: { icon: ReactNode; label: string; va
   );
 }
 
+function formatNumberCell(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? numberFormatter.format(value) : "-";
+}
+
+function formatSignedCell(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  return `${value >= 0 ? "+" : "-"}${numberFormatter.format(Math.abs(value))}`;
+}
+
+function formatPercentCell(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? percentFormatter.format(value) : "-";
+}
+
 function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis }) {
   const primaryMetric = analysis.context.metric_map.primary_metric ?? "Metrica nao detectada";
   const supportMetrics = Object.values(analysis.context.metric_map.support_metrics);
+  const monthlyComparisons = analysis.monthly_comparisons ?? [];
 
   return (
     <section className="panel managerial-panel">
@@ -908,6 +984,43 @@ function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis 
               <small>{kpi.detail}</small>
             </article>
           ))}
+        </div>
+      ) : null}
+
+      {monthlyComparisons.length ? (
+        <div className="managerial-monthly">
+          <div>
+            <strong>Comparativo mes a mes</strong>
+            <span>{monthlyComparisons.length} periodo(s) com leitura gerencial</span>
+          </div>
+          <div className="managerial-monthly-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th>Valor</th>
+                  <th>Variacao</th>
+                  <th>%</th>
+                  <th>Status</th>
+                  <th>Apoio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyComparisons.slice(-8).map((item) => (
+                  <tr key={item.period}>
+                    <td>{item.period}</td>
+                    <td>{formatNumberCell(item.value)}</td>
+                    <td>{formatSignedCell(item.variation)}</td>
+                    <td>{formatPercentCell(item.variation_pct)}</td>
+                    <td>
+                      <span className={`monthly-status severity-${item.severity}`}>{item.status}</span>
+                    </td>
+                    <td>{item.main_driver?.reading ?? item.managerial_reading}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
 

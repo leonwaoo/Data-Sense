@@ -532,6 +532,85 @@ h2 {
   font-size: clamp(1rem, 1.6vw, 1.22rem);
 }
 
+.managerial-monthly {
+  background: #ffffff;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.managerial-monthly > div:first-child {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.managerial-monthly strong {
+  color: #0f172a;
+}
+
+.managerial-monthly span {
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.managerial-monthly-table {
+  overflow-x: auto;
+}
+
+.managerial-monthly-table table {
+  border-collapse: collapse;
+  min-width: 860px;
+  width: 100%;
+}
+
+.managerial-monthly-table th,
+.managerial-monthly-table td {
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 0.84rem;
+  padding: 9px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.managerial-monthly-table th {
+  color: #64748b;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.monthly-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-weight: 850;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.monthly-status.severity-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.monthly-status.severity-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.monthly-status.severity-info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.monthly-status.severity-neutral {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .managerial-insight-grid {
   display: grid;
   gap: 12px;

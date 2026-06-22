@@ -9,6 +9,7 @@ from app.services.chart_service import suggest_charts
 from app.services.dashboard_service import build_dashboard
 from app.services.dataset_service import get_dataset, load_dataset, supported_formats
 from app.services.managerial_analysis_service import build_managerial_analysis
+from app.services.powerbi_service import build_powerbi_export
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 from app.services.report_service import build_report_pdf, build_report_png
@@ -135,4 +136,14 @@ def dataset_report_png(dataset_id: str) -> Response:
         content=build_report_png(dataset),
         media_type="image/png",
         headers={"Content-Disposition": f'attachment; filename="datasense-relatorio-{dataset.dataset_id[:8]}.png"'},
+    )
+
+
+@app.get("/datasets/{dataset_id}/powerbi.zip")
+def dataset_powerbi_export(dataset_id: str) -> Response:
+    dataset = get_dataset(dataset_id)
+    return Response(
+        content=build_powerbi_export(dataset),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="datasense-powerbi-{dataset.dataset_id[:8]}.zip"'},
     )

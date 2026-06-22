@@ -57,6 +57,7 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = _pdf_kpi_cards(pdf, context, margin, y, width)
     y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Diagnostico de variacao", _managerial_variation_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Comparativo mes a mes", _managerial_monthly_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Insights gerenciais", _managerial_insight_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Resumo do dataset", _summary_items(context), margin, y, width, height)
@@ -86,6 +87,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
         for items in [
             _managerial_summary_items(context),
             _managerial_variation_items(context),
+            _managerial_monthly_items(context),
             _managerial_insight_items(context),
             _managerial_action_items(context),
         ]
@@ -115,6 +117,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     y += 150
     y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Diagnostico de variacao", _managerial_variation_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Comparativo mes a mes", _managerial_monthly_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Insights gerenciais", _managerial_insight_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Resumo do dataset", _summary_items(context), fonts, x, y, max_width)
@@ -209,6 +212,22 @@ def _managerial_variation_items(context: ReportContext) -> list[str]:
             f"({_format_signed_number(trend.get('change'))}; {_format_pct(trend.get('change_pct'))})."
         )
     return items or ["Nao ha variacao temporal suficiente para diagnostico gerencial."]
+
+
+def _managerial_monthly_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    comparisons = analysis.get("monthly_comparisons") or []
+    items = []
+    for item in comparisons[-8:]:
+        driver = item.get("main_driver") or {}
+        driver_text = f" Apoio com maior mudanca: {driver.get('column')} {_format_signed_number(driver.get('variation'))}." if driver else ""
+        items.append(
+            f"{item.get('period')}: {item.get('status', 'sem status')}; "
+            f"valor {_format_number(item.get('value'))}; "
+            f"variacao {_format_signed_number(item.get('variation'))} ({_format_pct(item.get('variation_pct'))})."
+            f"{driver_text}"
+        )
+    return items or ["Sem comparativo mensal disponivel para exportacao."]
 
 
 def _managerial_insight_items(context: ReportContext) -> list[str]:

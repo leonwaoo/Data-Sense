@@ -2,9 +2,21 @@ import { BarChart3, Database, FileQuestion, ShieldCheck, Sparkles } from "lucide
 import { MetricCard } from "../common/MetricCard";
 import { MonthlyAnalysisSection } from "../managerial/MonthlyAnalysisSection";
 import { ManagerialInsightsSection } from "../managerial/ManagerialInsightsSection";
-import type { UploadResponse } from "../../types";
+import type { ManagerialAiReview, UploadResponse } from "../../types";
 
-export function OverviewSection({ dataset }: { dataset: UploadResponse }) {
+type OverviewSectionProps = {
+  dataset: UploadResponse;
+  managerialAiReview: ManagerialAiReview | null;
+  isManagerialAiLoading: boolean;
+  onManagerialAiReview: () => void;
+};
+
+export function OverviewSection({
+  dataset,
+  managerialAiReview,
+  isManagerialAiLoading,
+  onManagerialAiReview,
+}: OverviewSectionProps) {
   const profile = dataset.profile;
 
   return (
@@ -27,7 +39,14 @@ export function OverviewSection({ dataset }: { dataset: UploadResponse }) {
       </div>
 
       {dataset.managerial_analysis ? <MonthlyAnalysisSection analysis={dataset.managerial_analysis} /> : null}
-      {dataset.managerial_analysis ? <ManagerialInsightsSection analysis={dataset.managerial_analysis} /> : null}
+      {dataset.managerial_analysis ? (
+        <ManagerialInsightsSection
+          analysis={dataset.managerial_analysis}
+          aiReview={managerialAiReview}
+          isAiLoading={isManagerialAiLoading}
+          onAiReview={onManagerialAiReview}
+        />
+      ) : null}
     </div>
   );
 }

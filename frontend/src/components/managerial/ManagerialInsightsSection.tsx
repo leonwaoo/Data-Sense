@@ -1,11 +1,30 @@
-import { TrendingUp } from "lucide-react";
+import { BrainCircuit, Sparkles, TrendingUp } from "lucide-react";
 import { RootCauseSection } from "./RootCauseSection";
-import type { ManagerialAnalysis } from "../../types";
+import type { ManagerialAiReview, ManagerialAnalysis } from "../../types";
 
-export function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis }) {
+type ManagerialInsightsSectionProps = {
+  analysis: ManagerialAnalysis;
+  aiReview: ManagerialAiReview | null;
+  isAiLoading: boolean;
+  onAiReview: () => void;
+};
+
+export function ManagerialInsightsSection({
+  analysis,
+  aiReview,
+  isAiLoading,
+  onAiReview,
+}: ManagerialInsightsSectionProps) {
   const primaryMetric = analysis.context.metric_map.primary_metric ?? "Metrica nao detectada";
   const supportMetrics = Object.values(analysis.context.metric_map.support_metrics);
   const rootCause = analysis.root_cause_analysis ?? null;
+  const aiStatusLabel = aiReview?.ai_status === "completed"
+    ? `IA ${aiReview.model ?? "ativa"}`
+    : aiReview?.ai_status === "not_configured"
+      ? "Regras locais"
+      : aiReview?.ai_status === "failed"
+        ? "IA indisponivel"
+        : "Segunda leitura";
 
   return (
     <section className="panel managerial-panel">
@@ -26,6 +45,73 @@ export function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAn
         {analysis.summary.slice(0, 4).map((item) => (
           <p key={item}>{item}</p>
         ))}
+      </div>
+
+      <div className="managerial-ai-panel">
+        <div className="managerial-ai-heading">
+          <div>
+            <BrainCircuit size={20} />
+            <div>
+              <strong>Leitura executiva</strong>
+              <span>{aiStatusLabel}</span>
+            </div>
+          </div>
+          <button disabled={isAiLoading} onClick={onAiReview} type="button">
+            <Sparkles size={15} />
+            {isAiLoading ? "Analisando..." : aiReview ? "Atualizar leitura" : "Gerar leitura"}
+          </button>
+        </div>
+
+        {aiReview ? (
+          <div className="managerial-ai-body">
+            {aiReview.ai_status === "failed" && aiReview.ai_error ? (
+              <p className="managerial-ai-error">{aiReview.ai_error}</p>
+            ) : null}
+            <p>{aiReview.executive_summary}</p>
+            <div className="managerial-ai-grid">
+              <article>
+                <span>O que mudou</span>
+                <strong>{aiReview.what_changed}</strong>
+              </article>
+              <article>
+                <span>Impacto gerencial</span>
+                <strong>{aiReview.managerial_impact}</strong>
+              </article>
+            </div>
+            {aiReview.likely_causes.length ? (
+              <div className="managerial-ai-list">
+                <strong>Causas provaveis</strong>
+                {aiReview.likely_causes.slice(0, 3).map((cause) => (
+                  <article key={`${cause.title}-${cause.detail}`}>
+                    <div>
+                      <span>{cause.title}</span>
+                      <small>Confianca {cause.confidence}</small>
+                    </div>
+                    <p>{cause.detail}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            <div className="managerial-ai-columns">
+              <div>
+                <strong>Recomendacoes</strong>
+                {aiReview.recommendations.slice(0, 3).map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+              <div>
+                <strong>Perguntas para investigar</strong>
+                {aiReview.investigation_questions.slice(0, 3).map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="managerial-ai-empty">
+            Gere uma segunda leitura para transformar as evidencias calculadas em narrativa executiva.
+          </p>
+        )}
       </div>
 
       <div className="managerial-context-grid">

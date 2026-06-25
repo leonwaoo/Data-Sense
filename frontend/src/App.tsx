@@ -6,6 +6,7 @@ import {
   downloadPowerBi as apiDownloadPowerBi,
   downloadReport as apiDownloadReport,
   fetchDashboard,
+  fetchManagerialAiReview,
   uploadDataset,
 } from "./api";
 import { SUPPORTED_FILE_ACCEPT, defaultDashboardFilters, sampleFiles } from "./constants";
@@ -23,6 +24,7 @@ import type {
   DashboardPayload,
   DashboardSettings,
   HistoryItem,
+  ManagerialAiReview,
   SectionKey,
   UploadResponse,
 } from "./types";
@@ -38,6 +40,7 @@ export function App() {
   const [dataset, setDataset] = useState<UploadResponse | null>(null);
   const [section, setSection] = useState<SectionKey>("overview");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
+  const [managerialAiReview, setManagerialAiReview] = useState<ManagerialAiReview | null>(null);
   const [dashboardFilters, setDashboardFilters] = useState<DashboardFilters>(defaultDashboardFilters);
   const [dashboardSettings, setDashboardSettings] = useState<DashboardSettings>({
     title: "Dashboard DataSense",
@@ -49,6 +52,7 @@ export function App() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [isManagerialAiLoading, setIsManagerialAiLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | "powerbi" | null>(null);
@@ -69,6 +73,7 @@ export function App() {
     setError(null);
     setAnswer(null);
     setDashboard(null);
+    setManagerialAiReview(null);
     setDashboardFilters(defaultDashboardFilters);
 
     try {
@@ -161,6 +166,19 @@ export function App() {
     }
   }
 
+  async function handleManagerialAiReview() {
+    if (!dataset) return;
+    setIsManagerialAiLoading(true);
+    setError(null);
+    try {
+      setManagerialAiReview(await fetchManagerialAiReview(dataset.dataset_id));
+    } catch (reviewError) {
+      setError(reviewError instanceof Error ? reviewError.message : "Erro inesperado na leitura gerencial com IA.");
+    } finally {
+      setIsManagerialAiLoading(false);
+    }
+  }
+
   async function handleDownloadReport(format: "pdf" | "png") {
     if (!dataset) return;
     setExportingFormat(format);
@@ -243,7 +261,12 @@ export function App() {
               onUpload={(file) => void handleUpload(file)}
             />
           ) : section === "overview" ? (
-            <OverviewSection dataset={dataset} />
+            <OverviewSection
+              dataset={dataset}
+              isManagerialAiLoading={isManagerialAiLoading}
+              managerialAiReview={managerialAiReview}
+              onManagerialAiReview={() => void handleManagerialAiReview()}
+            />
           ) : section === "dashboard" ? (
             <DashboardSection
               dashboard={dashboard}

@@ -360,6 +360,144 @@
   width: 6px;
 }
 
+.managerial-ai-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.managerial-ai-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.managerial-ai-heading > div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.managerial-ai-heading svg {
+  color: var(--accent);
+}
+
+.managerial-ai-heading strong {
+  display: block;
+  font-size: 0.94rem;
+}
+
+.managerial-ai-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.managerial-ai-heading button {
+  align-items: center;
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.managerial-ai-heading button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.managerial-ai-body {
+  display: grid;
+  gap: 14px;
+}
+
+.managerial-ai-body > p,
+.managerial-ai-empty,
+.managerial-ai-error {
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.managerial-ai-error {
+  background: var(--danger-soft);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.managerial-ai-grid,
+.managerial-ai-columns {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.managerial-ai-grid article,
+.managerial-ai-columns > div,
+.managerial-ai-list article {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.managerial-ai-grid span,
+.managerial-ai-list small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.managerial-ai-grid strong {
+  color: var(--text-2);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.managerial-ai-list {
+  display: grid;
+  gap: 8px;
+}
+
+.managerial-ai-list > strong,
+.managerial-ai-columns strong {
+  font-size: 0.86rem;
+}
+
+.managerial-ai-list article > div {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.managerial-ai-list span {
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.managerial-ai-list p,
+.managerial-ai-columns p {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .managerial-insight-grid {
   display: grid;
   gap: 14px;
@@ -727,6 +865,12 @@
 }
 
 @media (max-width: 760px) {
+  .managerial-ai-heading,
+  .managerial-ai-list article > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .monthly-focus-body {
     grid-template-columns: 1fr;
   }

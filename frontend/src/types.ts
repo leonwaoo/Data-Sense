@@ -212,6 +212,28 @@ export type ManagerialAnalysis = {
   suggested_questions: string[];
 };
 
+export type ManagerialAiCause = {
+  title: string;
+  detail: string;
+  confidence: string;
+  evidence: string[];
+};
+
+export type ManagerialAiReview = {
+  mode: string;
+  ai_enabled: boolean;
+  ai_status: "not_configured" | "disabled" | "failed" | "completed" | string;
+  ai_error?: string;
+  model: string | null;
+  executive_summary: string;
+  what_changed: string;
+  likely_causes: ManagerialAiCause[];
+  managerial_impact: string;
+  recommendations: string[];
+  investigation_questions: string[];
+  confidence: string;
+};
+
 export type SuggestedQuestion = {
   question: string;
   category: string;

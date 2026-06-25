@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "./constants";
 import { hasActiveFilters } from "./utils/filters";
-import type { Answer, DashboardFilters, DashboardPayload, UploadResponse } from "./types";
+import type { Answer, DashboardFilters, DashboardPayload, ManagerialAiReview, UploadResponse } from "./types";
 
 export async function uploadDataset(file: File): Promise<UploadResponse> {
   const formData = new FormData();
@@ -38,6 +38,15 @@ export async function askQuestion(datasetId: string, question: string): Promise<
     throw new Error(payload?.detail || "Nao foi possivel responder a pergunta.");
   }
   return (await response.json()) as Answer;
+}
+
+export async function fetchManagerialAiReview(datasetId: string): Promise<ManagerialAiReview> {
+  const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/managerial-analysis/ai`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail || "Nao foi possivel gerar a leitura gerencial com IA.");
+  }
+  return (await response.json()) as ManagerialAiReview;
 }
 
 function triggerDownload(blob: Blob, fileName: string) {

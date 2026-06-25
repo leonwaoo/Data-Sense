@@ -254,6 +254,11 @@ type ManagerialAnalysis = {
   suggested_questions: string[];
 };
 
+type SuggestedQuestion = {
+  question: string;
+  category: string;
+};
+
 type UploadResponse = {
   dataset_id: string;
   file_name: string;
@@ -261,6 +266,7 @@ type UploadResponse = {
   preview: Record<string, CellValue>[];
   quality: Quality;
   managerial_analysis?: ManagerialAnalysis;
+  suggested_questions?: SuggestedQuestion[];
   supported_formats?: string[];
 };
 
@@ -377,7 +383,7 @@ const dashboardThemeMap: Record<DashboardTheme, { label: string; accent: string;
 
 const defaultDashboardFilters: DashboardFilters = { categories: {} };
 
-const suggestedQuestions = [
+const fallbackSuggestedQuestions = [
   "Quantas linhas e colunas existem?",
   "Qual coluna tem mais valores ausentes?",
   "Existem duplicatas?",
@@ -747,7 +753,10 @@ export function App() {
           <span>{dataset ? "Perguntas suportadas" : "Envie um arquivo primeiro"}</span>
         </div>
         <div className="suggestions">
-          {suggestedQuestions.map((suggestion) => (
+          {(dataset?.suggested_questions?.length
+            ? dataset.suggested_questions.map((item) => item.question)
+            : fallbackSuggestedQuestions
+          ).map((suggestion) => (
             <button disabled={!dataset || isAsking} key={suggestion} onClick={() => handleAsk(suggestion)} type="button">
               {suggestion}
             </button>

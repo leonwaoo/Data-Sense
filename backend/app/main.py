@@ -13,6 +13,7 @@ from app.services.powerbi_service import build_powerbi_export
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 from app.services.report_service import build_report_pdf, build_report_png
+from app.services.suggestion_service import build_suggested_questions
 
 app = FastAPI(
     title="DataSense API",
@@ -67,6 +68,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict:
         "preview": dataset.preview(),
         "quality": build_quality_report(dataset),
         "managerial_analysis": build_managerial_analysis(dataset),
+        "suggested_questions": build_suggested_questions(dataset),
     }
 
 
@@ -107,6 +109,11 @@ def ask_dataset(dataset_id: str, payload: dict) -> dict:
 @app.post("/datasets/{dataset_id}/charts/suggest")
 def dataset_chart_suggestions(dataset_id: str) -> list[dict]:
     return suggest_charts(get_dataset(dataset_id))
+
+
+@app.get("/datasets/{dataset_id}/questions/suggested")
+def dataset_suggested_questions(dataset_id: str) -> list[dict]:
+    return build_suggested_questions(get_dataset(dataset_id))
 
 
 @app.get("/datasets/{dataset_id}/dashboard")

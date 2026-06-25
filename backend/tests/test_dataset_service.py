@@ -5,6 +5,7 @@ import pytest
 
 from app.services import dataset_service
 from app.services.dataset_service import get_dataset, load_dataset
+from app.services.managerial_analysis_service import build_managerial_analysis
 
 
 def _csv_bytes(seed: int) -> bytes:
@@ -91,3 +92,53 @@ def test_load_dataset_detects_excel_header_after_decorative_title() -> None:
     assert dataset.dataframe.shape == (2, 3)
     assert dataset.ingest_report["metadata_rows_skipped"] == 1
     assert dataset.ingest_report["header_row_number"] == 2
+
+
+def test_load_dashboard_like_excel_and_build_managerial_inventory_analysis() -> None:
+    buffer = BytesIO()
+    dataframe = pd.DataFrame(
+        [
+            ["Dashboard gerencial de estoque", None, None, None, None, None, None, None],
+            [
+                "Ano",
+                "Month",
+                "Produto",
+                "FY GAAP",
+                "Estoque Total (TON)",
+                "Estoque Fabrica (TON)",
+                "Volume Industrializado (TON)",
+                "Custo (R$/TON)",
+            ],
+            [2025, "01-JAN", "Cafe A", "FY25", 1000, 700, 120, 450],
+            [2025, "01-JAN", "Cafe B", "FY25", 500, 300, 80, 440],
+            [2025, "02-FEV", "Cafe A", "FY25", 900, 650, 130, 455],
+            [2025, "02-FEV", "Cafe B", "FY25", 520, 310, 90, 442],
+            [2025, "03-MAR", "Cafe A", "FY25", 100, 180, 460, 470],
+            [2025, "03-MAR", "Cafe B", "FY25", 530, 320, 95, 445],
+        ]
+    )
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        dataframe.to_excel(writer, index=False, header=False)
+
+    dataset = load_dataset(buffer.getvalue(), "Dashboard.xlsx")
+    analysis = build_managerial_analysis(dataset)
+    context = analysis["context"]
+    root_cause = analysis["root_cause_analysis"]
+
+    assert dataset.dataframe.columns.tolist() == [
+        "Ano",
+        "Month",
+        "Produto",
+        "FY GAAP",
+        "Estoque Total (TON)",
+        "Estoque Fabrica (TON)",
+        "Volume Industrializado (TON)",
+        "Custo (R$/TON)",
+    ]
+    assert dataset.ingest_report["metadata_rows_skipped"] == 1
+    assert context["domain"]["type"] == "estoque_operacao"
+    assert context["metric_map"]["primary_metric"] == "Estoque Total (TON)"
+    assert context["time"]["label"] == "Ano + Month"
+    assert root_cause["period"] == "2025-03"
+    assert root_cause["primary_contributor"]["name"] == "Cafe A"
+    assert root_cause["dimension_impact_ranking"][0]["name"] == "Cafe A"

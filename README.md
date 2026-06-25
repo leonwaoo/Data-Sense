@@ -49,6 +49,7 @@ O sistema atuara como um assistente para analise de dados:
 - Detecta anomalias e problemas de qualidade.
 - Gera uma auditoria inteligente da confiabilidade da analise, apontando cabecalho suspeito, datas como texto, metricas inadequadas, totais negativos, nulos, duplicatas e outliers.
 - Pode usar IA para revisar a auditoria quando `OPENAI_API_KEY` estiver configurada; sem chave, usa regras locais.
+- Pode usar IA para uma segunda leitura gerencial em `/datasets/{id}/managerial-analysis/ai`, recebendo somente evidencias calculadas, como variacoes, causa raiz, alertas, drivers e limitacoes.
 - Sugere proximas analises e recomendacoes de negocio.
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
 - Renderiza graficos reais no relatorio, com mensagem clara quando nao ha dados suficientes para desenhar uma visualizacao.
@@ -101,7 +102,7 @@ A API ficara disponivel em:
 - `http://127.0.0.1:8000/health`
 - `http://127.0.0.1:8000/docs`
 
-Para ativar a revisao de qualidade com IA no backend local, copie o exemplo de ambiente:
+Para ativar a revisao de qualidade e a segunda leitura gerencial com IA no backend local, copie o exemplo de ambiente:
 
 ```bash
 copy .env.example .env
@@ -113,10 +114,11 @@ Depois edite `backend/.env` e preencha:
 OPENAI_API_KEY=sua_chave_openai
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_TIMEOUT_SECONDS=12
+DATASENSE_MANAGERIAL_AI_ENABLED=true
 ```
 
 A chave deve ficar somente no backend. Nunca coloque `OPENAI_API_KEY` no frontend ou na Vercel do frontend.
-Se `OPENAI_API_KEY` nao existir, a rota de auditoria usa somente regras locais e segue funcionando normalmente.
+Se `OPENAI_API_KEY` nao existir, as rotas de auditoria e analise gerencial com IA usam somente regras locais e seguem funcionando normalmente.
 
 ### Frontend
 
@@ -166,6 +168,7 @@ Para ativar IA em producao, configure no Render, dentro do Web Service da API:
 - `OPENAI_API_KEY`: chave da OpenAI.
 - `OPENAI_MODEL`: `gpt-4o-mini`.
 - `OPENAI_TIMEOUT_SECONDS`: `12`.
+- `DATASENSE_MANAGERIAL_AI_ENABLED`: `true` para ativar a segunda leitura gerencial por IA.
 
 ### Frontend na Vercel
 

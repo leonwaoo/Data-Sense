@@ -24,6 +24,7 @@ from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.services.analytics_service import answer_question
+from app.services.ai_managerial_service import build_managerial_ai_review
 from app.services.ai_quality_service import build_quality_audit
 from app.services.chart_service import suggest_charts
 from app.services.dashboard_service import build_dashboard
@@ -115,6 +116,11 @@ def dataset_quality_audit(dataset_id: str) -> dict:
 @app.get("/datasets/{dataset_id}/managerial-analysis")
 def dataset_managerial_analysis(dataset_id: str) -> dict:
     return build_managerial_analysis(get_dataset(dataset_id))
+
+
+@app.get("/datasets/{dataset_id}/managerial-analysis/ai")
+def dataset_managerial_ai_review(dataset_id: str) -> dict:
+    return build_managerial_ai_review(get_dataset(dataset_id))
 
 
 @app.post("/datasets/{dataset_id}/ask")

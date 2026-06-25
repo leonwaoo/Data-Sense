@@ -1,6 +1,7 @@
 import csv
 import re
 import warnings
+from collections import OrderedDict
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,11 @@ from app.services.column_heuristics import normalize_text as _normalize_text
 
 MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".csv", ".tsv", ".txt", ".xlsx", ".xls", ".json"}
-_DATASETS: dict[str, DatasetSession] = {}
+# Limite de datasets mantidos em memoria. Sem teto, uploads sucessivos fariam o
+# processo crescer indefinidamente no servidor. Usamos politica LRU: o dataset
+# acessado ha mais tempo e descartado primeiro.
+MAX_ACTIVE_DATASETS = 32
+_DATASETS: "OrderedDict[str, DatasetSession]" = OrderedDict()
 
 
 def load_dataset(content: bytes, file_name: str) -> DatasetSession:
@@ -41,6 +46,9 @@ def load_dataset(content: bytes, file_name: str) -> DatasetSession:
         ingest_report=ingest_report,
     )
     _DATASETS[dataset.dataset_id] = dataset
+    _DATASETS.move_to_end(dataset.dataset_id)
+    while len(_DATASETS) > MAX_ACTIVE_DATASETS:
+        _DATASETS.popitem(last=False)
     return dataset
 
 
@@ -52,6 +60,7 @@ def get_dataset(dataset_id: str) -> DatasetSession:
     dataset = _DATASETS.get(dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset nao encontrado.")
+    _DATASETS.move_to_end(dataset_id)
     return dataset
 
 

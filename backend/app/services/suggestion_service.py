@@ -56,11 +56,20 @@ def build_suggested_questions(dataset: DatasetSession) -> list[dict]:
             add(f"Mostre a contagem por {group_column}.", "ranking")
         rankings += 1
 
-    # 4. Media da metrica como aprofundamento.
+    # 4. Cardinalidade da principal dimensao de negocio.
+    primary_group = None
+    for _label, candidates in GROUP_CANDIDATES:
+        primary_group = _find_column(df.columns, candidates)
+        if primary_group:
+            break
+    if primary_group:
+        add(f"Quantos {primary_group} diferentes existem?", "exploracao")
+
+    # 5. Media da metrica como aprofundamento.
     if metric_column:
         add(f"Qual a media de {metric_column}?", "metrica")
 
-    # 5. Qualidade de dados, quando ha algo a investigar.
+    # 6. Qualidade de dados, quando ha algo a investigar.
     if int(df.isna().sum().sum()) > 0:
         add("Qual coluna tem mais valores ausentes?", "qualidade")
     if int(df.duplicated().sum()) > 0:

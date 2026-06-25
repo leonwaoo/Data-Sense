@@ -107,6 +107,17 @@ def answer_question(dataset: DatasetSession, question: str) -> dict:
             "chart": {"type": "bar", "x": "coluna", "y": "valores_ausentes", "data": data},
         }
 
+    if any(term in normalized for term in ["diferentes", "distintos", "distintas", "unicos", "unicas"]):
+        distinct_column, distinct_label = _select_group_column(df, normalized)
+        if distinct_column:
+            distinct = int(df[distinct_column].nunique(dropna=True))
+            return {
+                "answer": f"Existem {distinct} {distinct_label}(s) distinto(s) em {distinct_column}.",
+                "calculation": f"nunique({distinct_column})",
+                "table": [{"coluna": distinct_column, "valores_distintos": distinct}],
+                "chart": None,
+            }
+
     metric_column = _select_metric_column(df, normalized)
     date_column = _find_column(df.columns, DATE_CANDIDATES)
     group_column, group_label = _select_group_column(df, normalized)

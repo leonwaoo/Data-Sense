@@ -130,6 +130,12 @@ export type RootCauseDimensionDriver = {
   coverage: number | null;
 };
 
+export type RootCauseImpactRank = RootCauseContributor & {
+  dimension: string;
+  label: string;
+  reading: string;
+};
+
 export type RootCauseWaterfallStep = {
   label: string;
   kind: "baseline" | "increase" | "decrease" | "current" | string;
@@ -160,6 +166,8 @@ export type RootCauseAnalysis = {
   };
   primary_contributor: RootCauseContributor | null;
   dimension_drivers: RootCauseDimensionDriver[];
+  dimension_impact_ranking?: RootCauseImpactRank[];
+  concentration_alerts?: string[];
   supporting_metrics: ManagerialDriver[];
   waterfall: {
     dimension?: string | null;

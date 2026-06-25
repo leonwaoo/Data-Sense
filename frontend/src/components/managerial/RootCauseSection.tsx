@@ -10,6 +10,8 @@ export function RootCauseSection({ rootCause }: { rootCause: RootCauseAnalysis |
   const contributors = primaryDimension?.contributors ?? [];
   const movement = rootCause.movement;
   const responsible = rootCause.responsible_month;
+  const impactRanking = rootCause.dimension_impact_ranking ?? [];
+  const concentrationAlerts = rootCause.concentration_alerts ?? [];
 
   return (
     <div className="root-cause-panel">
@@ -67,6 +69,33 @@ export function RootCauseSection({ rootCause }: { rootCause: RootCauseAnalysis |
 
         <WaterfallMiniChart steps={rootCause.waterfall.steps} />
       </div>
+
+      {impactRanking.length ? (
+        <div className="root-cause-ranking">
+          <div>
+            <strong>Ranking de contribuição</strong>
+            <span>Produtos, categorias ou recortes que mais explicam a mudança</span>
+          </div>
+          <div className="impact-ranking-list">
+            {impactRanking.slice(0, 6).map((item) => (
+              <div className="impact-ranking-row" key={`${item.dimension}-${item.name}`}>
+                <span>{item.name}</span>
+                <small>{item.label}</small>
+                <strong>{formatSignedCell(item.variation)}</strong>
+                <em>{formatPercentCell(item.share_of_abs_change)}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {concentrationAlerts.length ? (
+        <div className="root-cause-alerts">
+          {concentrationAlerts.slice(0, 3).map((alert) => (
+            <span key={alert}>{alert}</span>
+          ))}
+        </div>
+      ) : null}
 
       <footer className="root-cause-recommendation">
         <strong>Acao recomendada</strong>

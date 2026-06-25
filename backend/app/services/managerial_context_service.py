@@ -184,7 +184,7 @@ def select_dimensions(profile: dict, domain: dict) -> list[dict]:
     for term in rule.get("dimensions", []):
         column = first_matching(column_names, [term])
         if column and column not in used and column not in metric_like_columns:
-            dimensions.append({"label": term, "column": column})
+            dimensions.append({"label": column, "column": column})
             used.add(column)
     return dimensions[:4]
 

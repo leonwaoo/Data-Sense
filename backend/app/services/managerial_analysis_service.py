@@ -122,10 +122,15 @@ def _build_variation_diagnostic(
     insights.extend(_abnormal_insights(abnormal_periods, primary_metric))
 
     summary = _executive_summary(period_metrics, primary_metric, domain, focus, latest, driver_evidence)
-    alerts = _alerts(abnormal_periods, focus, metric_map, period_metrics)
     recommendations = _recommendations(domain["type"], focus, primary_metric, driver_evidence, abnormal_periods)
     monthly_comparisons = _monthly_comparisons(period_metrics, metric_map, domain)
     root_cause_analysis = _root_cause_analysis(prepared, period_metrics, metric_map, dimensions, domain, focus, driver_evidence)
+    alerts = _deduplicate(
+        [
+            *_alerts(abnormal_periods, focus, metric_map, period_metrics),
+            *root_cause_analysis.get("concentration_alerts", []),
+        ]
+    )
 
     return {
         "summary": summary,
@@ -195,6 +200,8 @@ def _root_cause_analysis(
     direction = "alta" if (variation or 0) >= 0 else "queda"
 
     dimension_drivers = _root_dimension_drivers(prepared, dimensions, focus_period, previous_period, variation)
+    dimension_impact_ranking = _dimension_impact_ranking(dimension_drivers)
+    concentration_alerts = _dimension_concentration_alerts(dimension_drivers)
     primary_dimension = next((item for item in dimension_drivers if item.get("contributors")), None)
     top_contributor = primary_dimension["contributors"][0] if primary_dimension else None
     waterfall = _waterfall_payload(previous_value, current_value, focus_period, previous_period, top_contributor, primary_dimension)
@@ -237,6 +244,8 @@ def _root_cause_analysis(
         },
         "primary_contributor": top_contributor,
         "dimension_drivers": dimension_drivers,
+        "dimension_impact_ranking": dimension_impact_ranking,
+        "concentration_alerts": concentration_alerts,
         "supporting_metrics": driver_evidence[:4],
         "waterfall": waterfall,
         "summary": summary,
@@ -300,6 +309,52 @@ def _root_dimension_drivers(
         )
 
     return drivers
+
+
+def _dimension_impact_ranking(dimension_drivers: list[dict]) -> list[dict]:
+    ranking = []
+    for driver in dimension_drivers:
+        for contributor in driver.get("contributors", [])[:5]:
+            variation = _safe_float(contributor.get("variation"))
+            share_abs = _safe_float(contributor.get("share_of_abs_change"))
+            if variation is None:
+                continue
+            ranking.append(
+                {
+                    "dimension": driver.get("dimension"),
+                    "label": driver.get("label"),
+                    "name": contributor.get("name"),
+                    "current_value": contributor.get("current_value"),
+                    "previous_value": contributor.get("previous_value"),
+                    "variation": _round_or_none(variation),
+                    "share_of_abs_change": _round_or_none(share_abs),
+                    "share_of_total_change": contributor.get("share_of_total_change"),
+                    "reading": (
+                        f"{contributor.get('name')} em {driver.get('label')} respondeu por "
+                        f"{_format_pct(share_abs)} da variacao absoluta analisada."
+                    ),
+                }
+            )
+    return sorted(ranking, key=lambda item: abs(_safe_float(item.get("variation")) or 0), reverse=True)[:12]
+
+
+def _dimension_concentration_alerts(dimension_drivers: list[dict]) -> list[str]:
+    alerts = []
+    for driver in dimension_drivers:
+        contributors = driver.get("contributors", [])
+        if not contributors:
+            continue
+        top = contributors[0]
+        share_abs = _safe_float(top.get("share_of_abs_change")) or 0
+        if share_abs >= 0.8:
+            alerts.append(
+                f"{top.get('name')} concentra {_format_pct(share_abs)} da variacao em {driver.get('label')}."
+            )
+        elif share_abs >= 0.6:
+            alerts.append(
+                f"{top.get('name')} tem peso relevante em {driver.get('label')}: {_format_pct(share_abs)} da variacao."
+            )
+    return alerts
 
 
 def _waterfall_payload(

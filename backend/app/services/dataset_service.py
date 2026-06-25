@@ -69,11 +69,24 @@ def get_dataset(dataset_id: str) -> DatasetSession:
 def _validate_ingest_report(report: dict) -> None:
     source_type = report.get("source_type")
     header_confidence = float(report.get("header_confidence") or 0)
-    if source_type in {"delimited", "excel"} and header_confidence < MIN_HEADER_CONFIDENCE:
+    if (
+        source_type in {"delimited", "excel"}
+        and header_confidence < MIN_HEADER_CONFIDENCE
+        and not _is_valid_single_column_header(report)
+    ):
         raise ValueError(
             "Nao foi possivel identificar um cabecalho confiavel. "
             "Inclua uma linha com nomes de colunas antes dos dados."
         )
+
+
+def _is_valid_single_column_header(report: dict) -> bool:
+    return (
+        int(report.get("source_columns_estimate") or 0) == 1
+        and int(report.get("header_text_cells") or 0) == 1
+        and int(report.get("header_numeric_cells") or 0) == 0
+        and int(report.get("raw_rows_estimate") or 0) >= 2
+    )
 
 
 def _read_dataset(content: bytes, extension: str) -> tuple[pd.DataFrame, dict]:
@@ -229,6 +242,7 @@ def _promote_detected_header(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, dic
     body = dataframe.iloc[header_index + 1 :].copy()
     body.columns = headers
     body = body.dropna(how="all").dropna(axis=1, how="all")
+    header_profile = _header_cells_profile(headers)
 
     warnings_list: list[str] = []
     if header_index > 0:
@@ -242,7 +256,17 @@ def _promote_detected_header(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, dic
         "metadata_rows_skipped": int(header_index),
         "header_confidence": _header_confidence(header_score),
         "source_columns_estimate": int(dataframe.shape[1]),
+        **header_profile,
         "warnings": warnings_list,
+    }
+
+
+def _header_cells_profile(headers: list[Any]) -> dict:
+    values = [str(value).strip() for value in headers if pd.notna(value) and str(value).strip()]
+    return {
+        "header_non_empty_cells": len(values),
+        "header_text_cells": sum(bool(re.search(r"[A-Za-z_]", value)) for value in values),
+        "header_numeric_cells": sum(_looks_like_number(value) for value in values),
     }
 
 

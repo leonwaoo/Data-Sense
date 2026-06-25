@@ -58,6 +58,20 @@ def test_load_dataset_rejects_numeric_csv_without_header() -> None:
         load_dataset(b"1,2,3\n4,5,6\n", "sem_header.csv")
 
 
+def test_load_dataset_accepts_single_column_csv_with_text_header() -> None:
+    dataset = load_dataset("valor\n10\n20\n".encode("utf-8"), "uma_coluna.csv")
+
+    assert dataset.dataframe.columns.tolist() == ["valor"]
+    assert dataset.dataframe["valor"].tolist() == [10, 20]
+    assert dataset.ingest_report["header_text_cells"] == 1
+    assert dataset.ingest_report["header_numeric_cells"] == 0
+
+
+def test_load_dataset_rejects_single_column_csv_without_text_header() -> None:
+    with pytest.raises(ValueError, match="cabecalho confiavel"):
+        load_dataset(b"10\n20\n30\n", "uma_coluna_sem_header.csv")
+
+
 def test_load_dataset_detects_excel_header_after_decorative_title() -> None:
     buffer = BytesIO()
     dataframe = pd.DataFrame(

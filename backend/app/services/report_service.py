@@ -26,6 +26,21 @@ from app.services.quality_service import build_quality_report
 
 _format_number = partial(format_number, none_text="n/d", compact_large=True)
 
+MONTH_NAMES_PT = {
+    1: "Janeiro",
+    2: "Fevereiro",
+    3: "Março",
+    4: "Abril",
+    5: "Maio",
+    6: "Junho",
+    7: "Julho",
+    8: "Agosto",
+    9: "Setembro",
+    10: "Outubro",
+    11: "Novembro",
+    12: "Dezembro",
+}
+
 
 @dataclass(frozen=True)
 class ReportChart:
@@ -232,10 +247,12 @@ def _managerial_root_cause_items(context: ReportContext) -> list[str]:
     responsible = root_cause.get("responsible_month") or {}
     primary_contributor = root_cause.get("primary_contributor") or {}
     waterfall = root_cause.get("waterfall") or {}
+    impact_ranking = root_cause.get("dimension_impact_ranking") or []
+    concentration_alerts = root_cause.get("concentration_alerts") or []
 
     if movement:
         items.append(
-            f"Movimento principal: {root_cause.get('metric', 'metrica')} saiu de "
+            f"Movimento principal em {_period_label(root_cause.get('period'))}: {root_cause.get('metric', 'metrica')} saiu de "
             f"{_format_number(movement.get('previous_value'))} para {_format_number(movement.get('current_value'))}; "
             f"variacao {_format_signed_number(movement.get('variation'))} ({_format_pct(movement.get('variation_pct'))})."
         )
@@ -250,15 +267,23 @@ def _managerial_root_cause_items(context: ReportContext) -> list[str]:
             f"Comparacao historica: media anterior {_format_number(responsible.get('historical_mean'))}; "
             f"distancia {_format_signed_number(responsible.get('historical_delta'))}."
         )
+    for item in impact_ranking[:3]:
+        items.append(
+            f"Ranking de contribuicao: {item.get('name')} em {item.get('label')} "
+            f"moveu {_format_signed_number(item.get('variation'))} "
+            f"({_format_pct(item.get('share_of_abs_change'))} da variacao absoluta)."
+        )
+    for alert in concentration_alerts[:2]:
+        items.append(f"Concentracao relevante: {alert}")
     if waterfall.get("steps"):
-        labels = ", ".join(str(step.get("label")) for step in waterfall["steps"][:6] if step.get("label"))
+        labels = ", ".join(_period_label(step.get("label")) for step in waterfall["steps"][:6] if step.get("label"))
         items.append(f"Waterfall gerado com os principais passos: {labels}.")
 
     confidence = root_cause.get("confidence")
     recommendation = root_cause.get("recommendation")
     if confidence or recommendation:
         items.append(f"Confianca: {confidence or 'n/d'}. Recomendacao: {recommendation or 'validar evidencias principais'}.")
-    return items[:7] or ["Sem causa raiz suficiente para exportacao nesta base."]
+    return items[:10] or ["Sem causa raiz suficiente para exportacao nesta base."]
 
 
 def _managerial_monthly_items(context: ReportContext) -> list[str]:
@@ -269,7 +294,7 @@ def _managerial_monthly_items(context: ReportContext) -> list[str]:
         driver = item.get("main_driver") or {}
         driver_text = f" Apoio com maior mudanca: {driver.get('column')} {_format_signed_number(driver.get('variation'))}." if driver else ""
         items.append(
-            f"{item.get('period')}: {item.get('status', 'sem status')}; "
+            f"{_period_label(item.get('period'))}: {item.get('status', 'sem status')}; "
             f"valor {_format_number(item.get('value'))}; "
             f"variacao {_format_signed_number(item.get('variation'))} ({_format_pct(item.get('variation_pct'))})."
             f"{driver_text}"
@@ -309,7 +334,7 @@ def _managerial_action_items(context: ReportContext) -> list[str]:
 
 
 def _movement_sentence(label: str, movement: dict) -> str:
-    period = movement.get("period")
+    period = _period_label(movement.get("period"))
     value = _format_number(movement.get("value"))
     variation = _format_signed_number(movement.get("variation"))
     variation_pct = _format_pct(movement.get("variation_pct"))
@@ -876,6 +901,15 @@ def _format_pct(value: object) -> str:
         return f"{float(value):.1%}".replace(".", ",")
     except (TypeError, ValueError):
         return "n/d"
+
+
+def _period_label(value: object) -> str:
+    text = _clean_display_text(str(value or ""))
+    try:
+        period = pd.Period(text, freq="M")
+    except (TypeError, ValueError):
+        return text
+    return f"{period.month:02d} {MONTH_NAMES_PT.get(period.month, text)}/{period.year}"
 
 
 def _truncate(value: str, limit: int) -> str:

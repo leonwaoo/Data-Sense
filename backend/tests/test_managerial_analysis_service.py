@@ -43,6 +43,28 @@ def _multi_dimension_inventory_dataset() -> DatasetSession:
     return DatasetSession(dataset_id="teste-multi", file_name="estoque_multi.xlsx", dataframe=dataframe)
 
 
+def _year_over_year_inventory_dataset() -> DatasetSession:
+    rows = []
+    for year, values in {
+        2024: [800, 850, 900, 920],
+        2025: [1000, 1100, 950, 760],
+    }.items():
+        for month, value in zip(["JAN", "FEV", "MAR", "ABR"], values, strict=True):
+            rows.append(
+                {
+                    "Ano": year,
+                    "Month": month,
+                    "Produto": "Cafe Arabica",
+                    "FY GAAP": f"FY{str(year)[-2:]}",
+                    "Estoque Total (TON)": value,
+                    "Estoque Fabrica (TON)": value * 0.7,
+                    "Volume Industrializado (TON)": value * 0.2,
+                    "Custo (R$/TON)": 450 + (year - 2024) * 15,
+                }
+            )
+    return DatasetSession(dataset_id="teste-yoy", file_name="estoque_yoy.xlsx", dataframe=pd.DataFrame(rows))
+
+
 def test_detect_analysis_domain_recognizes_inventory_operations() -> None:
     dataset = _inventory_dataset()
     profile = build_profile(dataset)
@@ -94,3 +116,14 @@ def test_managerial_analysis_ranks_dimension_contributors_and_concentration_aler
     assert ranking[0]["share_of_abs_change"] >= 0.9
     assert any("Cafe A" in alert for alert in alerts)
     assert any("Cafe A" in alert for alert in analysis["alerts"])
+
+
+def test_managerial_analysis_builds_complete_comparative_summary() -> None:
+    analysis = build_managerial_analysis(_year_over_year_inventory_dataset())
+
+    comparative = analysis["comparative_summary"]
+    labels = {card["label"] for card in comparative["cards"]}
+
+    assert {"Ultimos 3 meses", "Acumulado do ano", "Media movel 3M", "Melhor mes", "Pior mes"}.issubset(labels)
+    assert any("ultimos 3 meses" in reading.lower() for reading in comparative["readings"])
+    assert any("2025" in reading for reading in comparative["readings"])

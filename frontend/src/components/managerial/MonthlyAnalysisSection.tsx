@@ -60,6 +60,7 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
     (left, right) => periodOrder(left.period) - periodOrder(right.period),
   );
   const latest = monthlyComparisons[monthlyComparisons.length - 1];
+  const comparativeSummary = analysis.comparative_summary;
   const [selectedPeriod, setSelectedPeriod] = useState(latest?.period ?? "");
 
   useEffect(() => {
@@ -172,6 +173,26 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
           <small>{formatSignedCell(biggestDrop?.variation)}</small>
         </article>
       </div>
+
+      {comparativeSummary?.cards?.length ? (
+        <div className="monthly-comparison-grid">
+          {comparativeSummary.cards.slice(0, 5).map((card) => (
+            <article className={`comparison-tone-${card.tone ?? "neutral"}`} key={`${card.label}-${card.value}`}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.detail}</small>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {comparativeSummary?.readings?.length ? (
+        <div className="monthly-comparison-readings">
+          {comparativeSummary.readings.slice(0, 3).map((reading) => (
+            <p key={reading}>{reading}</p>
+          ))}
+        </div>
+      ) : null}
 
       <div className="monthly-focus-body">
         <div className="monthly-chart-card">

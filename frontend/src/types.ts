@@ -114,6 +114,16 @@ export type ManagerialMonthlyComparison = {
   drivers: ManagerialDriver[];
 };
 
+export type ManagerialComparativeSummary = {
+  cards: {
+    label: string;
+    value: string;
+    detail: string;
+    tone?: "neutral" | "good" | "warning" | "danger" | string;
+  }[];
+  readings: string[];
+};
+
 export type RootCauseContributor = {
   name: string;
   current_value: number | null;
@@ -207,6 +217,7 @@ export type ManagerialAnalysis = {
   insights: ManagerialInsight[];
   root_cause_analysis?: RootCauseAnalysis | null;
   monthly_comparisons?: ManagerialMonthlyComparison[];
+  comparative_summary?: ManagerialComparativeSummary;
   alerts: string[];
   recommendations: string[];
   suggested_questions: string[];

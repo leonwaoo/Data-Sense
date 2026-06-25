@@ -99,6 +99,66 @@
   font-size: 0.78rem;
 }
 
+.monthly-comparison-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.monthly-comparison-grid article {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+}
+
+.monthly-comparison-grid article.comparison-tone-good {
+  border-left-color: #16a34a;
+}
+
+.monthly-comparison-grid article.comparison-tone-warning {
+  border-left-color: var(--warning);
+}
+
+.monthly-comparison-grid article.comparison-tone-danger {
+  border-left-color: var(--danger);
+}
+
+.monthly-comparison-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.monthly-comparison-grid strong {
+  font-size: 1rem;
+}
+
+.monthly-comparison-grid small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.monthly-comparison-readings {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.monthly-comparison-readings p {
+  color: var(--text-2);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
 .monthly-selector {
   display: grid;
   gap: 8px;

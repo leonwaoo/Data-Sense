@@ -76,6 +76,7 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = _pdf_kpi_cards(pdf, context, margin, y, width)
     y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Diagnostico de variacao", _managerial_variation_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Comparativos gerenciais", _managerial_comparative_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Causa raiz gerencial", _managerial_root_cause_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Comparativo mes a mes", _managerial_monthly_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Insights gerenciais", _managerial_insight_items(context), margin, y, width, height)
@@ -107,6 +108,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
         for items in [
             _managerial_summary_items(context),
             _managerial_variation_items(context),
+            _managerial_comparative_items(context),
             _managerial_root_cause_items(context),
             _managerial_monthly_items(context),
             _managerial_insight_items(context),
@@ -138,6 +140,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     y += 150
     y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Diagnostico de variacao", _managerial_variation_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Comparativos gerenciais", _managerial_comparative_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Causa raiz gerencial", _managerial_root_cause_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Comparativo mes a mes", _managerial_monthly_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Insights gerenciais", _managerial_insight_items(context), fonts, x, y, max_width)
@@ -234,6 +237,21 @@ def _managerial_variation_items(context: ReportContext) -> list[str]:
             f"({_format_signed_number(trend.get('change'))}; {_format_pct(trend.get('change_pct'))})."
         )
     return items or ["Nao ha variacao temporal suficiente para diagnostico gerencial."]
+
+
+def _managerial_comparative_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    comparative = analysis.get("comparative_summary") or {}
+    cards = comparative.get("cards") or []
+    readings = [str(item) for item in comparative.get("readings", []) if item]
+    items = []
+    for card in cards[:5]:
+        label = card.get("label") or "Comparativo"
+        value = card.get("value") or "n/d"
+        detail = card.get("detail") or ""
+        items.append(f"{label}: {value}. {detail}")
+    items.extend(readings[:4])
+    return items[:8] or ["Sem comparativos gerenciais suficientes para exportacao."]
 
 
 def _managerial_root_cause_items(context: ReportContext) -> list[str]:

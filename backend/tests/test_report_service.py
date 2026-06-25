@@ -2,6 +2,7 @@ import pandas as pd
 
 from app.models import DatasetSession
 from app.services.report_service import (
+    _managerial_comparative_items,
     _managerial_monthly_items,
     _managerial_root_cause_items,
     _period_label,
@@ -36,7 +37,9 @@ def test_report_managerial_items_include_month_labels_and_contribution_ranking()
 
     root_items = _managerial_root_cause_items(context)
     monthly_items = _managerial_monthly_items(context)
+    comparative_items = _managerial_comparative_items(context)
 
+    assert any("Ultimos 3 meses" in item for item in comparative_items)
     assert any("03 Março/2025" in item for item in root_items)
     assert any("Ranking de contribuicao: Cafe A" in item for item in root_items)
     assert any("Concentracao relevante: Cafe A" in item for item in root_items)

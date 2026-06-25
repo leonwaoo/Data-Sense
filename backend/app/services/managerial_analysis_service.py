@@ -53,6 +53,7 @@ def build_managerial_analysis(dataset: DatasetSession) -> dict:
         "variations": diagnostic["variations"],
         "root_cause_analysis": diagnostic["root_cause_analysis"],
         "monthly_comparisons": diagnostic["monthly_comparisons"],
+        "comparative_summary": diagnostic["comparative_summary"],
         "driver_evidence": diagnostic["driver_evidence"],
         "alerts": diagnostic["alerts"],
         "recommendations": diagnostic["recommendations"],
@@ -124,6 +125,7 @@ def _build_variation_diagnostic(
     summary = _executive_summary(period_metrics, primary_metric, domain, focus, latest, driver_evidence)
     recommendations = _recommendations(domain["type"], focus, primary_metric, driver_evidence, abnormal_periods)
     monthly_comparisons = _monthly_comparisons(period_metrics, metric_map, domain)
+    comparative_summary = _comparative_summary(period_metrics, primary_metric)
     root_cause_analysis = _root_cause_analysis(prepared, period_metrics, metric_map, dimensions, domain, focus, driver_evidence)
     alerts = _deduplicate(
         [
@@ -145,6 +147,7 @@ def _build_variation_diagnostic(
         },
         "root_cause_analysis": root_cause_analysis,
         "monthly_comparisons": monthly_comparisons,
+        "comparative_summary": comparative_summary,
         "driver_evidence": driver_evidence,
         "alerts": alerts,
         "recommendations": recommendations,
@@ -159,6 +162,7 @@ def _build_variation_diagnostic(
             "driver_evidence": driver_evidence,
             "root_cause_analysis": root_cause_analysis,
             "monthly_comparisons": monthly_comparisons[-12:],
+            "comparative_summary": comparative_summary,
             "abnormal_periods": [_movement_payload(row) for _, row in abnormal_periods.head(8).iterrows()],
             "limitations": [],
         },
@@ -516,6 +520,99 @@ def _monthly_comparisons(period_metrics: pd.DataFrame, metric_map: dict, domain:
     return comparisons
 
 
+def _comparative_summary(period_metrics: pd.DataFrame, primary_metric: str) -> dict:
+    if period_metrics.empty:
+        return {"cards": [], "readings": []}
+
+    metrics = period_metrics.copy()
+    metrics["_period"] = metrics["periodo"].map(_safe_period)
+    metrics = metrics[metrics["_period"].notna()].copy()
+    if metrics.empty:
+        return {"cards": [], "readings": []}
+
+    latest = metrics.iloc[-1]
+    latest_period = latest["_period"]
+    latest_value = _safe_float(latest.get("valor"))
+    best = metrics.sort_values("valor", ascending=False).iloc[0]
+    worst = metrics.sort_values("valor", ascending=True).iloc[0]
+    last_3 = metrics.tail(3)
+    previous_3 = metrics.iloc[max(0, len(metrics) - 6) : max(0, len(metrics) - 3)]
+    last_3_total = _safe_float(last_3["valor"].sum()) if not last_3.empty else None
+    previous_3_total = _safe_float(previous_3["valor"].sum()) if not previous_3.empty else None
+    last_3_delta = None if last_3_total is None or previous_3_total is None else last_3_total - previous_3_total
+    last_3_pct = last_3_delta / abs(previous_3_total) if last_3_delta is not None and previous_3_total else None
+
+    same_year = metrics[metrics["_period"].map(lambda period: period.year == latest_period.year)]
+    ytd_current = _safe_float(same_year[same_year["_period"].map(lambda period: period.month <= latest_period.month)]["valor"].sum())
+    previous_year = metrics[
+        metrics["_period"].map(lambda period: period.year == latest_period.year - 1 and period.month <= latest_period.month)
+    ]
+    ytd_previous = _safe_float(previous_year["valor"].sum()) if not previous_year.empty else None
+    ytd_delta = None if ytd_previous is None else ytd_current - ytd_previous
+    ytd_pct = ytd_delta / abs(ytd_previous) if ytd_delta is not None and ytd_previous else None
+
+    moving_average_3 = _safe_float(last_3["valor"].mean()) if not last_3.empty else None
+    latest_vs_average = None if latest_value is None or moving_average_3 is None else latest_value - moving_average_3
+    latest_vs_average_pct = latest_vs_average / abs(moving_average_3) if latest_vs_average is not None and moving_average_3 else None
+
+    cards = [
+        {
+            "label": "Ultimos 3 meses",
+            "value": _format_number(last_3_total),
+            "detail": f"{_format_signed_number(last_3_delta)} vs 3 meses anteriores ({_format_pct(last_3_pct)})",
+            "tone": _comparison_tone(last_3_delta),
+        },
+        {
+            "label": "Acumulado do ano",
+            "value": _format_number(ytd_current),
+            "detail": (
+                f"{_format_signed_number(ytd_delta)} vs ano anterior ({_format_pct(ytd_pct)})"
+                if ytd_previous is not None
+                else "Sem ano anterior equivalente"
+            ),
+            "tone": _comparison_tone(ytd_delta),
+        },
+        {
+            "label": "Media movel 3M",
+            "value": _format_number(moving_average_3),
+            "detail": f"Mes atual {_format_signed_number(latest_vs_average)} contra a media ({_format_pct(latest_vs_average_pct)})",
+            "tone": _comparison_tone(latest_vs_average),
+        },
+        {
+            "label": "Melhor mes",
+            "value": str(best["periodo"]),
+            "detail": _format_number(best.get("valor")),
+            "tone": "good",
+        },
+        {
+            "label": "Pior mes",
+            "value": str(worst["periodo"]),
+            "detail": _format_number(worst.get("valor")),
+            "tone": "warning",
+        },
+    ]
+    readings = [
+        f"Nos ultimos 3 meses, {primary_metric} somou {_format_number(last_3_total)}; comparado aos 3 meses anteriores, a diferenca foi {_format_signed_number(last_3_delta)}.",
+        f"No acumulado de {latest_period.year}, {primary_metric} soma {_format_number(ytd_current)} ate {latest_period.month:02d}/{latest_period.year}.",
+        f"O mes atual ficou {_format_signed_number(latest_vs_average)} em relacao a media movel de 3 meses.",
+        f"Melhor mes da serie: {best['periodo']} com {_format_number(best.get('valor'))}. Pior mes: {worst['periodo']} com {_format_number(worst.get('valor'))}.",
+    ]
+    return {"cards": cards, "readings": readings}
+
+
+def _safe_period(value: object):
+    try:
+        return pd.Period(str(value), freq="M")
+    except (TypeError, ValueError):
+        return None
+
+
+def _comparison_tone(value: float | None) -> str:
+    if value is None:
+        return "neutral"
+    return "good" if value > 0 else "warning" if value < 0 else "neutral"
+
+
 def _monthly_driver_changes(period_metrics: pd.DataFrame, metric_map: dict, movement: pd.Series) -> list[dict]:
     drivers = []
     focus_index = int(movement.name) if isinstance(movement.name, int) else period_metrics.index[period_metrics["periodo"] == movement["periodo"]][0]
@@ -763,6 +860,7 @@ def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) ->
         "variations": {},
         "root_cause_analysis": None,
         "monthly_comparisons": [],
+        "comparative_summary": {"cards": [], "readings": []},
         "driver_evidence": [],
         "alerts": limitations,
         "recommendations": ["Adicionar ou confirmar coluna de periodo para habilitar diagnostico de alta, queda e tendencia."],
@@ -794,6 +892,7 @@ def _empty_diagnostic(metric_map: dict, domain: dict, reason: str) -> dict:
         "variations": {},
         "root_cause_analysis": None,
         "monthly_comparisons": [],
+        "comparative_summary": {"cards": [], "readings": []},
         "driver_evidence": [],
         "alerts": [reason],
         "recommendations": ["Validar periodo e granularidade do arquivo."],

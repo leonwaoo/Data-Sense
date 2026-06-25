@@ -1,8 +1,9 @@
-import { LayoutDashboard, LineChart, MessageSquareText, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import { LayoutDashboard, LineChart, MessageSquareText, Plus, ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
 import type { SectionKey, UploadResponse } from "../../types";
 
 const NAV_ITEMS: { key: SectionKey; label: string; icon: typeof LineChart; hint: string }[] = [
   { key: "overview", label: "Visao geral", icon: LineChart, hint: "Metricas e analise gerencial" },
+  { key: "diagnostic", label: "Diagnostico", icon: Stethoscope, hint: "Causa raiz e leitura executiva" },
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, hint: "KPIs e graficos automaticos" },
   { key: "chat", label: "Chat analitico", icon: MessageSquareText, hint: "Pergunte aos dados" },
   { key: "reports", label: "Relatorios", icon: ShieldCheck, hint: "Exportar e historico" },

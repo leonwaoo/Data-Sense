@@ -343,4 +343,4 @@ export type HistoryItem = {
   createdAt: string;
 };
 
-export type SectionKey = "overview" | "dashboard" | "chat" | "reports";
+export type SectionKey = "overview" | "diagnostic" | "dashboard" | "chat" | "reports";

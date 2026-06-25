@@ -390,6 +390,32 @@
 }
 
 /* Managerial */
+.diagnostic-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.diagnostic-empty > div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.diagnostic-empty svg {
+  color: var(--accent);
+}
+
+.diagnostic-empty strong {
+  font-size: 0.94rem;
+}
+
+.diagnostic-empty p {
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 .managerial-panel {
   display: flex;
   flex-direction: column;

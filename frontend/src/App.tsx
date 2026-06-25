@@ -13,6 +13,7 @@ import { SUPPORTED_FILE_ACCEPT, defaultDashboardFilters, sampleFiles } from "./c
 import type { SampleFile } from "./constants";
 import { Sidebar } from "./components/layout/Sidebar";
 import { OverviewSection } from "./components/sections/OverviewSection";
+import { DiagnosticSection } from "./components/sections/DiagnosticSection";
 import { DashboardSection } from "./components/sections/DashboardSection";
 import { ChatSection } from "./components/sections/ChatSection";
 import { ReportsSection } from "./components/sections/ReportsSection";
@@ -31,6 +32,7 @@ import type {
 
 const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
   overview: { title: "Visao geral", subtitle: "Resumo do dataset e analise gerencial mes a mes" },
+  diagnostic: { title: "Diagnostico gerencial", subtitle: "Causa raiz, leitura executiva e recomendacoes para decisao" },
   dashboard: { title: "Dashboard", subtitle: "KPIs, graficos e qualidade gerados automaticamente" },
   chat: { title: "Chat analitico", subtitle: "Pergunte aos dados em linguagem natural" },
   reports: { title: "Relatorios", subtitle: "Exportacoes, arquivos de teste e historico" },
@@ -261,10 +263,12 @@ export function App() {
               onUpload={(file) => void handleUpload(file)}
             />
           ) : section === "overview" ? (
-            <OverviewSection
-              dataset={dataset}
+            <OverviewSection dataset={dataset} />
+          ) : section === "diagnostic" ? (
+            <DiagnosticSection
+              aiReview={managerialAiReview}
+              analysis={dataset.managerial_analysis}
               isManagerialAiLoading={isManagerialAiLoading}
-              managerialAiReview={managerialAiReview}
               onManagerialAiReview={() => void handleManagerialAiReview()}
             />
           ) : section === "dashboard" ? (

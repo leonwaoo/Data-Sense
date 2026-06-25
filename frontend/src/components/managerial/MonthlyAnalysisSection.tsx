@@ -46,6 +46,10 @@ function formatMonthLabel(period: string) {
   return monthName ? `${match[2]} ${monthName}/${match[1]}` : period;
 }
 
+function formatZScore(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "-";
+}
+
 function chartPayloadPeriod(state: unknown) {
   const payload = state as { activePayload?: { payload?: MonthlyChartPoint }[] };
   return payload.activePayload?.[0]?.payload?.period;
@@ -86,6 +90,11 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
     variation: item.variation ?? 0,
   }));
   const selectedLabel = formatMonthLabel(selectedMonth.period);
+  const selectedDrivers = selectedMonth.drivers?.length
+    ? selectedMonth.drivers
+    : selectedMonth.main_driver
+      ? [selectedMonth.main_driver]
+      : [];
 
   function handleChartClick(state: unknown) {
     const period = chartPayloadPeriod(state);
@@ -202,6 +211,48 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
           {selectedMonth.main_driver ? <span>{selectedMonth.main_driver.reading}</span> : null}
           {abnormalMonths.length ? <small>{abnormalMonths.length} período(s) exigem atenção.</small> : <small>Nenhum período crítico nos últimos dados.</small>}
         </div>
+      </div>
+
+      <div className="monthly-detail-panel">
+        <div className="monthly-detail-heading">
+          <strong>Detalhes de {formatMonthLabel(selectedMonth.period)}</strong>
+          <span>{selectedMonth.status}</span>
+        </div>
+        <div className="monthly-detail-grid">
+          <article>
+            <span>Valor do mês</span>
+            <strong>{formatNumberCell(selectedMonth.value)}</strong>
+          </article>
+          <article>
+            <span>Mês anterior</span>
+            <strong>{formatNumberCell(selectedMonth.previous_value)}</strong>
+          </article>
+          <article>
+            <span>Média histórica</span>
+            <strong>{formatNumberCell(selectedMonth.historical_mean)}</strong>
+          </article>
+          <article>
+            <span>Z-score</span>
+            <strong>{formatZScore(selectedMonth.z_score)}</strong>
+          </article>
+        </div>
+        {selectedDrivers.length ? (
+          <div className="monthly-driver-list">
+            {selectedDrivers.slice(0, 4).map((driver) => (
+              <article key={`${selectedMonth.period}-${driver.driver}-${driver.column}`}>
+                <div>
+                  <strong>{driver.driver}</strong>
+                  <span>{driver.column}</span>
+                </div>
+                <div>
+                  <strong>{formatSignedCell(driver.variation)}</strong>
+                  <span>{formatPercentCell(driver.variation_pct)}</span>
+                </div>
+                <p>{driver.reading}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="monthly-simple-table">

@@ -5,30 +5,38 @@ import { formatNumberCell, formatPercentCell, formatSignedCell } from "../../uti
 import type { ManagerialAnalysis, ManagerialMonthlyComparison } from "../../types";
 
 const monthNames = [
-  "janeiro",
-  "fevereiro",
-  "marco",
-  "abril",
-  "maio",
-  "junho",
-  "julho",
-  "agosto",
-  "setembro",
-  "outubro",
-  "novembro",
-  "dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
+
+function periodOrder(period: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return Number(`${match[1]}${match[2]}`);
+}
 
 function formatMonthLabel(period: string) {
   const match = /^(\d{4})-(\d{2})$/.exec(period);
   if (!match) return period;
   const monthNumber = Number(match[2]);
   const monthName = monthNames[monthNumber - 1];
-  return monthName ? `${match[2]} ${monthName}` : period;
+  return monthName ? `${match[2]} ${monthName}/${match[1]}` : period;
 }
 
 export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnalysis }) {
-  const monthlyComparisons = analysis.monthly_comparisons ?? [];
+  const monthlyComparisons = [...(analysis.monthly_comparisons ?? [])].sort(
+    (left, right) => periodOrder(left.period) - periodOrder(right.period),
+  );
   const latest = monthlyComparisons[monthlyComparisons.length - 1];
   const [selectedPeriod, setSelectedPeriod] = useState(latest?.period ?? "");
 
@@ -40,7 +48,7 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
 
   if (!monthlyComparisons.length || !latest) return null;
 
-  const metric = analysis.context.metric_map.primary_metric ?? "Metrica principal";
+  const metric = analysis.context.metric_map.primary_metric ?? "Métrica principal";
   const visibleMonths = monthlyComparisons.slice(-12);
   const selectedMonth = visibleMonths.find((item) => item.period === selectedPeriod) ?? latest;
   const movements = monthlyComparisons.filter((item) => typeof item.variation === "number" && Number.isFinite(item.variation));
@@ -55,6 +63,7 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
   const abnormalMonths = monthlyComparisons.filter((item) => item.status === "Fora do padrao" || item.severity === "danger");
   const chartData = visibleMonths.map((item) => ({
     period: item.period,
+    label: formatMonthLabel(item.period),
     value: item.value ?? 0,
     variation: item.variation ?? 0,
   }));
@@ -65,7 +74,7 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
         <div>
           <Clock size={20} />
           <div>
-            <h2>Acompanhamento mes a mes</h2>
+            <h2>Acompanhamento mês a mês</h2>
             <span>{metric} - foco em {formatMonthLabel(selectedMonth.period)}</span>
           </div>
         </div>
@@ -88,23 +97,23 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
 
       <div className="monthly-focus-kpis">
         <article>
-          <span>Mes selecionado</span>
+          <span>Mês selecionado</span>
           <strong>{formatMonthLabel(selectedMonth.period)}</strong>
           <small>{formatNumberCell(selectedMonth.value)}</small>
         </article>
         <article>
-          <span>Variacao mensal</span>
+          <span>Variação mensal</span>
           <strong>{formatSignedCell(selectedMonth.variation)}</strong>
           <small>{formatPercentCell(selectedMonth.variation_pct)}</small>
         </article>
         <article>
           <span>Maior alta</span>
-          <strong>{biggestIncrease?.period ?? "-"}</strong>
+          <strong>{biggestIncrease ? formatMonthLabel(biggestIncrease.period) : "-"}</strong>
           <small>{formatSignedCell(biggestIncrease?.variation)}</small>
         </article>
         <article>
           <span>Maior queda</span>
-          <strong>{biggestDrop?.period ?? "-"}</strong>
+          <strong>{biggestDrop ? formatMonthLabel(biggestDrop.period) : "-"}</strong>
           <small>{formatSignedCell(biggestDrop?.variation)}</small>
         </article>
       </div>
@@ -112,15 +121,15 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
       <div className="monthly-focus-body">
         <div className="monthly-chart-card">
           <div>
-            <strong>Evolucao mensal</strong>
-            <span>linha simples para acompanhar tendencia</span>
+            <strong>Evolução mensal</strong>
+            <span>Linha simples para acompanhar tendência</span>
           </div>
           <ResponsiveContainer height={240} width="100%">
             <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 12, top: 14 }}>
               <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-              <XAxis dataKey="period" minTickGap={18} tick={{ fill: "#64748b", fontSize: 12 }} />
+              <XAxis dataKey="label" minTickGap={18} tick={{ fill: "#64748b", fontSize: 12 }} />
               <YAxis tick={{ fill: "#64748b", fontSize: 12 }} width={56} />
-              <Tooltip formatter={(value) => formatNumberCell(Number(value))} labelFormatter={(label) => `Periodo ${label}`} />
+              <Tooltip formatter={(value) => formatNumberCell(Number(value))} labelFormatter={(label) => `Período ${label}`} />
               <Line dataKey="value" dot={{ r: 3 }} name={metric} stroke="#0f766e" strokeWidth={2.5} type="monotone" />
             </LineChart>
           </ResponsiveContainer>
@@ -130,7 +139,7 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
           <strong>Leitura de {formatMonthLabel(selectedMonth.period)}</strong>
           <p>{selectedMonth.managerial_reading}</p>
           {selectedMonth.main_driver ? <span>{selectedMonth.main_driver.reading}</span> : null}
-          {abnormalMonths.length ? <small>{abnormalMonths.length} periodo(s) exigem atencao.</small> : <small>Nenhum periodo critico nos ultimos dados.</small>}
+          {abnormalMonths.length ? <small>{abnormalMonths.length} período(s) exigem atenção.</small> : <small>Nenhum período crítico nos últimos dados.</small>}
         </div>
       </div>
 
@@ -138,9 +147,9 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
         <table>
           <thead>
             <tr>
-              <th>Mes</th>
+              <th>Mês</th>
               <th>Valor</th>
-              <th>Variacao</th>
+              <th>Variação</th>
               <th>%</th>
               <th>Status</th>
               <th>Leitura</th>

@@ -165,6 +165,19 @@
   font-size: 0.78rem;
 }
 
+.monthly-chart-card .recharts-wrapper {
+  cursor: pointer;
+}
+
+.monthly-chart-dot {
+  cursor: pointer;
+  transition: r 120ms ease, stroke-width 120ms ease;
+}
+
+.monthly-chart-dot.is-selected {
+  filter: drop-shadow(0 0 5px rgba(15, 118, 110, 0.35));
+}
+
 .monthly-reading-card {
   display: flex;
   flex-direction: column;

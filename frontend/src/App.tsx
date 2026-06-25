@@ -15,6 +15,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { OverviewSection } from "./components/sections/OverviewSection";
 import { DiagnosticSection } from "./components/sections/DiagnosticSection";
 import { DashboardSection } from "./components/sections/DashboardSection";
+import { DetailsSection } from "./components/sections/DetailsSection";
 import { ChatSection } from "./components/sections/ChatSection";
 import { ReportsSection } from "./components/sections/ReportsSection";
 import { UploadView } from "./components/sections/UploadView";
@@ -31,9 +32,10 @@ import type {
 } from "./types";
 
 const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
-  overview: { title: "Visao geral", subtitle: "Resumo do dataset e analise gerencial mes a mes" },
-  diagnostic: { title: "Diagnostico gerencial", subtitle: "Causa raiz, leitura executiva e recomendacoes para decisao" },
-  dashboard: { title: "Dashboard", subtitle: "KPIs, graficos e qualidade gerados automaticamente" },
+  overview: { title: "Inicio", subtitle: "Leitura simples para entender o que merece atencao" },
+  diagnostic: { title: "Diagnostico gerencial", subtitle: "Causa raiz, impacto e acoes recomendadas" },
+  dashboard: { title: "Graficos", subtitle: "Visualizacoes simples para explorar o arquivo" },
+  details: { title: "Detalhes", subtitle: "Metricas, qualidade e estrutura tecnica do dataset" },
   chat: { title: "Chat analitico", subtitle: "Pergunte aos dados em linguagem natural" },
   reports: { title: "Relatorios", subtitle: "Exportacoes, arquivos de teste e historico" },
 };
@@ -281,6 +283,8 @@ export function App() {
               onResetFilters={handleResetDashboardFilters}
               onSettingsChange={setDashboardSettings}
             />
+          ) : section === "details" ? (
+            <DetailsSection dashboard={dashboard} dataset={dataset} />
           ) : section === "chat" ? (
             <ChatSection
               answer={answer}

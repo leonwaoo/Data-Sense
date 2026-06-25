@@ -8,7 +8,6 @@ import { EmptyState } from "../common/EmptyState";
 import { ChartTypeControl } from "../dashboard/ChartTypeControl";
 import { DashboardCustomization } from "../dashboard/DashboardCustomization";
 import { DashboardFiltersPanel } from "../dashboard/DashboardFiltersPanel";
-import { DashboardKpiCard } from "../dashboard/DashboardKpiCard";
 import type { DashboardChart, DashboardFilters, DashboardPayload, DashboardSettings } from "../../types";
 
 export function DashboardSection({
@@ -123,13 +122,11 @@ export function DashboardSection({
         <div>
           {settings.logoDataUrl ? <img alt="" className="dashboard-logo" src={settings.logoDataUrl} /> : <LayoutDashboard size={22} />}
           <div>
-            <h2>{settings.title || dashboard.title}</h2>
-            <span>{dashboard.subtitle}</span>
+            <h2>{settings.title || "Graficos do arquivo"}</h2>
+            <span>Use os filtros para explorar visualmente, sem mexer nos detalhes tecnicos</span>
           </div>
         </div>
-        <span className="domain-pill">
-          {dashboard.domain.label} - {Math.round(dashboard.domain.confidence * 100)}%
-        </span>
+        <span className="domain-pill">{dashboard.domain.label}</span>
       </div>
 
       <div className="dashboard-toolbox no-print">
@@ -150,12 +147,6 @@ export function DashboardSection({
             {isExportingDashboard ? "Gerando PNG..." : "Exportar PNG"}
           </button>
         </div>
-      </div>
-
-      <div className="dashboard-kpis">
-        {dashboard.kpis.map((kpi) => (
-          <DashboardKpiCard key={`${kpi.label}-${kpi.value}`} kpi={kpi} />
-        ))}
       </div>
 
       <div className="dashboard-chart-grid">

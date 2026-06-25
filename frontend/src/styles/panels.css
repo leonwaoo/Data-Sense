@@ -101,3 +101,120 @@
   font-size: 0.86rem;
   white-space: nowrap;
 }
+
+.executive-home {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.executive-home-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.executive-home-heading > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.executive-home-heading svg {
+  color: var(--accent);
+}
+
+.executive-home-heading h2 {
+  font-size: 1.18rem;
+}
+
+.executive-home-heading span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.executive-lead {
+  color: var(--text-2);
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 860px;
+}
+
+.executive-card-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.executive-card-grid article {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 190px;
+  padding: 18px;
+}
+
+.executive-card-grid svg {
+  color: var(--accent);
+}
+
+.executive-card-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.executive-card-grid strong {
+  font-size: 1.05rem;
+}
+
+.executive-card-grid p {
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.technical-grid-panel {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.technical-grid-panel article,
+.technical-kpi-list article {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.technical-grid-panel strong,
+.technical-kpi-list strong {
+  font-size: 0.92rem;
+}
+
+.technical-grid-panel p,
+.technical-kpi-list small {
+  color: var(--text-2);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.technical-kpi-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.technical-kpi-list span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}

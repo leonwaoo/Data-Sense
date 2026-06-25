@@ -370,4 +370,4 @@ export type HistoryItem = {
   createdAt: string;
 };
 
-export type SectionKey = "overview" | "diagnostic" | "dashboard" | "chat" | "reports";
+export type SectionKey = "overview" | "diagnostic" | "dashboard" | "details" | "chat" | "reports";

@@ -1,10 +1,11 @@
-import { LayoutDashboard, LineChart, MessageSquareText, Plus, ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
+import { FileText, LayoutDashboard, LineChart, MessageSquareText, Plus, ShieldCheck, Sparkles, Stethoscope } from "lucide-react";
 import type { SectionKey, UploadResponse } from "../../types";
 
 const NAV_ITEMS: { key: SectionKey; label: string; icon: typeof LineChart; hint: string }[] = [
-  { key: "overview", label: "Visao geral", icon: LineChart, hint: "Metricas e analise gerencial" },
-  { key: "diagnostic", label: "Diagnostico", icon: Stethoscope, hint: "Causa raiz e leitura executiva" },
-  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, hint: "KPIs e graficos automaticos" },
+  { key: "overview", label: "Inicio", icon: LineChart, hint: "Leitura simples para decisao" },
+  { key: "diagnostic", label: "Diagnostico", icon: Stethoscope, hint: "Causa raiz e acoes" },
+  { key: "dashboard", label: "Graficos", icon: LayoutDashboard, hint: "Visualizacao dos dados" },
+  { key: "details", label: "Detalhes", icon: FileText, hint: "Metricas e qualidade" },
   { key: "chat", label: "Chat analitico", icon: MessageSquareText, hint: "Pergunte aos dados" },
   { key: "reports", label: "Relatorios", icon: ShieldCheck, hint: "Exportar e historico" },
 ];
@@ -63,9 +64,7 @@ export function Sidebar({
             <Sparkles size={15} />
             <div>
               <strong>{dataset.file_name}</strong>
-              <small>
-                {dataset.profile.rows.toLocaleString("pt-BR")} linhas - qualidade {dataset.quality.score}/100
-              </small>
+              <small>Arquivo pronto para analise</small>
             </div>
           </div>
         ) : (

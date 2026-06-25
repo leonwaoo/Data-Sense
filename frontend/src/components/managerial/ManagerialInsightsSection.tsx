@@ -15,8 +15,6 @@ export function ManagerialInsightsSection({
   isAiLoading,
   onAiReview,
 }: ManagerialInsightsSectionProps) {
-  const primaryMetric = analysis.context.metric_map.primary_metric ?? "Metrica nao detectada";
-  const supportMetrics = Object.values(analysis.context.metric_map.support_metrics);
   const rootCause = analysis.root_cause_analysis ?? null;
   const dimensionNarratives = analysis.dimension_narratives ?? rootCause?.dimension_narratives ?? [];
   const aiStatusLabel = aiReview?.ai_status === "completed"
@@ -39,10 +37,14 @@ export function ManagerialInsightsSection({
             </span>
           </div>
         </div>
-        <span className="domain-pill">{primaryMetric}</span>
+        <span className="domain-pill">{analysis.context.domain.label}</span>
       </div>
 
       <div className="managerial-summary">
+        <div className="managerial-section-heading">
+          <strong>Resumo executivo</strong>
+          <span>Visao inicial da mudanca mais relevante</span>
+        </div>
         {analysis.summary.slice(0, 4).map((item) => (
           <p key={item}>{item}</p>
         ))}
@@ -115,36 +117,6 @@ export function ManagerialInsightsSection({
         )}
       </div>
 
-      <div className="managerial-context-grid">
-        <article>
-          <span>Tempo</span>
-          <strong>{analysis.context.time.label ?? "Nao detectado"}</strong>
-          <small>{analysis.context.time.columns.join(" + ") || "Sem coluna temporal"}</small>
-        </article>
-        <article>
-          <span>Metricas de apoio</span>
-          <strong>{supportMetrics.length ? supportMetrics.slice(0, 2).join(", ") : "Nenhuma"}</strong>
-          <small>{supportMetrics.length > 2 ? `+${supportMetrics.length - 2} outra(s)` : "Usadas para explicar causas"}</small>
-        </article>
-        <article>
-          <span>Dimensoes</span>
-          <strong>{analysis.context.dimensions.map((item) => item.column).join(", ") || "Nao detectadas"}</strong>
-          <small>Onde localizar a variacao</small>
-        </article>
-      </div>
-
-      {analysis.kpis.length ? (
-        <div className="managerial-kpis">
-          {analysis.kpis.slice(0, 6).map((kpi) => (
-            <article key={`${kpi.label}-${kpi.value}`}>
-              <span>{kpi.label}</span>
-              <strong>{kpi.value}</strong>
-              <small>{kpi.detail}</small>
-            </article>
-          ))}
-        </div>
-      ) : null}
-
       <RootCauseSection rootCause={rootCause} />
 
       {dimensionNarratives.length ? (
@@ -177,6 +149,11 @@ export function ManagerialInsightsSection({
           </div>
         </div>
       ) : null}
+
+      <div className="managerial-section-heading">
+        <strong>Alertas e recomendacoes</strong>
+        <span>Prioridades para decisao e investigacao</span>
+      </div>
 
       <div className="managerial-insight-grid">
         {analysis.insights.slice(0, 4).map((insight) => (

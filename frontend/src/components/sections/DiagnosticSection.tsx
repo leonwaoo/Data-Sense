@@ -29,6 +29,12 @@ export function DiagnosticSection({
 
   return (
     <div className="section-stack">
+      <section className="panel diagnostic-strip">
+        <div>
+          <strong>Diagnostico gerencial</strong>
+          <span>Resumo executivo, causa raiz, leituras por dimensao, alertas e recomendacoes</span>
+        </div>
+      </section>
       <ManagerialInsightsSection
         aiReview={aiReview}
         analysis={analysis}

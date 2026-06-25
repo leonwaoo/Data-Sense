@@ -101,13 +101,21 @@ A API ficara disponivel em:
 - `http://127.0.0.1:8000/health`
 - `http://127.0.0.1:8000/docs`
 
-Para ativar a revisao de qualidade com IA no backend, configure:
+Para ativar a revisao de qualidade com IA no backend local, copie o exemplo de ambiente:
+
+```bash
+copy .env.example .env
+```
+
+Depois edite `backend/.env` e preencha:
 
 ```bash
 OPENAI_API_KEY=sua_chave_openai
-OPENAI_MODEL=gpt-5.4-mini
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TIMEOUT_SECONDS=12
 ```
 
+A chave deve ficar somente no backend. Nunca coloque `OPENAI_API_KEY` no frontend ou na Vercel do frontend.
 Se `OPENAI_API_KEY` nao existir, a rota de auditoria usa somente regras locais e segue funcionando normalmente.
 
 ### Frontend
@@ -152,6 +160,12 @@ O arquivo `render.yaml` define a API como um Web Service Python:
 - Build: `pip install -r requirements.txt`
 - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - Health check: `/health`
+
+Para ativar IA em producao, configure no Render, dentro do Web Service da API:
+
+- `OPENAI_API_KEY`: chave da OpenAI.
+- `OPENAI_MODEL`: `gpt-4o-mini`.
+- `OPENAI_TIMEOUT_SECONDS`: `12`.
 
 ### Frontend na Vercel
 

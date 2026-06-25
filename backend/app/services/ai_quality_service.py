@@ -22,8 +22,9 @@ from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
-DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+PLACEHOLDER_API_KEYS = {"sua_chave_openai", "your_openai_api_key", "cole_sua_chave_aqui"}
 
 METRIC_NOISE_TERMS = {
     "id",
@@ -75,7 +76,7 @@ def build_quality_audit(dataset: DatasetSession) -> dict:
 
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     model = os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
-    if not api_key:
+    if not _has_real_api_key(api_key):
         return {
             **rule_audit,
             "ai_enabled": False,
@@ -102,6 +103,10 @@ def build_quality_audit(dataset: DatasetSession) -> dict:
             "ai_error": _safe_error_message(exc),
             "model": model,
         }
+
+
+def _has_real_api_key(api_key: str) -> bool:
+    return bool(api_key and api_key.lower() not in PLACEHOLDER_API_KEYS)
 
 
 def _build_evidence(dataset: DatasetSession, profile: dict, quality: dict, dashboard: dict) -> dict:

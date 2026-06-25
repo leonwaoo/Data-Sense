@@ -6,8 +6,10 @@ import pandas as pd
 
 from app.models import DatasetSession
 from app.services.column_heuristics import (
+    is_adjustment_metric as _is_adjustment_metric,
     is_metric_noise,
     looks_like_identifier as _looks_like_identifier,
+    metric_score as _metric_score,
     normalize_text_for_search as _normalize_text,
 )
 from app.services.date_utils import parse_common_dates
@@ -57,8 +59,6 @@ METRIC_NOISE_TERMS = [
     "percentual",
     "taxa",
 ]
-NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento", "ajuste", "abatimento"]
-NEGATIVE_ALLOWED_TERMS = ["lucro", "margem", "saldo"]
 _is_metric_noise = partial(is_metric_noise, terms=METRIC_NOISE_TERMS)
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 GROUP_CANDIDATES = [
@@ -283,7 +283,22 @@ def _select_metric_column(df: pd.DataFrame, normalized_question: str) -> str | N
 
 
 def _best_metric_column(df: pd.DataFrame, numeric_columns: list[str], candidates: list[str], domain: str) -> str | None:
-    scored_columns = [(_metric_score(df, column, candidates, domain), column) for column in numeric_columns]
+    scored_columns = [
+        (
+            _metric_score(
+                df,
+                column,
+                domain=domain,
+                domain_candidates=candidates,
+                value_candidates=VALUE_CANDIDATES,
+                metric_noise_terms=METRIC_NOISE_TERMS,
+                domain_base=110,
+                value_base=70,
+            ),
+            column,
+        )
+        for column in numeric_columns
+    ]
     scored_columns.sort(reverse=True)
     if scored_columns and scored_columns[0][0] > 0:
         return scored_columns[0][1]
@@ -294,38 +309,6 @@ def _best_metric_column(df: pd.DataFrame, numeric_columns: list[str], candidates
         if not _looks_like_identifier(column) and not _is_metric_noise(column) and not _is_adjustment_metric(column)
     ]
     return (filtered or numeric_columns)[0] if numeric_columns else None
-
-
-def _metric_score(df: pd.DataFrame, column: str, candidates: list[str], domain: str) -> float:
-    normalized = _normalize_text(column).replace(" ", "_")
-    if _looks_like_identifier(column) or _is_metric_noise(column):
-        return -1000
-
-    score = 0.0
-    for index, candidate in enumerate(candidates):
-        if candidate in normalized:
-            score += max(18, 110 - index * 5)
-    for index, candidate in enumerate(VALUE_CANDIDATES):
-        if candidate in normalized:
-            score += max(10, 70 - index * 3)
-
-    if _is_adjustment_metric(column):
-        score -= 220
-    if domain == "vendas" and any(term in normalized for term in ["compra", "custo", "despesa", "gasto"]):
-        score -= 70
-    if domain == "compras" and any(term in normalized for term in ["receita", "faturamento", "venda"]):
-        score -= 50
-
-    series = pd.to_numeric(df[column], errors="coerce").dropna()
-    if series.empty:
-        return -1000
-    negative_ratio = float((series < 0).sum() / len(series))
-    if negative_ratio > 0 and not any(term in normalized for term in NEGATIVE_ALLOWED_TERMS):
-        score -= 160 * negative_ratio
-    if negative_ratio >= 0.35 and not any(term in normalized for term in NEGATIVE_ALLOWED_TERMS):
-        score -= 120
-
-    return score
 
 
 def _select_group_column(df: pd.DataFrame, normalized_question: str) -> tuple[str | None, str]:
@@ -361,11 +344,6 @@ def _find_column(columns, candidates: list[str]) -> str | None:
             if candidate in normalized:
                 return str(original)
     return None
-
-
-def _is_adjustment_metric(column: str) -> bool:
-    normalized = _normalize_text(column).replace(" ", "_")
-    return any(term in normalized for term in NEGATIVE_METRIC_TERMS)
 
 
 def _quote_identifier(column: str) -> str:

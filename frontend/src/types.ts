@@ -129,8 +129,13 @@ export type RootCauseContributor = {
   current_value: number | null;
   previous_value: number | null;
   variation: number | null;
+  variation_pct_vs_previous?: number | null;
   share_of_abs_change: number | null;
   share_of_total_change: number | null;
+  historical_mean?: number | null;
+  historical_delta?: number | null;
+  concentration_level?: "alta" | "media" | "baixa" | string;
+  recurrence_flag?: "recorrente" | "pontual" | string;
 };
 
 export type RootCauseDimensionDriver = {
@@ -144,6 +149,26 @@ export type RootCauseImpactRank = RootCauseContributor & {
   dimension: string;
   label: string;
   reading: string;
+};
+
+export type DimensionNarrative = {
+  dimension: string;
+  label: string;
+  top_movers: RootCauseContributor[];
+  share_concentration: {
+    top_1: number | null;
+    top_3: number | null;
+    level: "alta" | "media" | "baixa" | string;
+  };
+  historical_comparison: {
+    historical_mean: number | null;
+    historical_delta: number | null;
+    historical_delta_pct: number | null;
+  };
+  narrative: string;
+  managerial_impact: string;
+  possible_causes?: string[];
+  recommendation?: string;
 };
 
 export type RootCauseWaterfallStep = {
@@ -177,6 +202,7 @@ export type RootCauseAnalysis = {
   primary_contributor: RootCauseContributor | null;
   dimension_drivers: RootCauseDimensionDriver[];
   dimension_impact_ranking?: RootCauseImpactRank[];
+  dimension_narratives?: DimensionNarrative[];
   concentration_alerts?: string[];
   supporting_metrics: ManagerialDriver[];
   waterfall: {
@@ -216,6 +242,7 @@ export type ManagerialAnalysis = {
   kpis: { label: string; value: string; detail: string }[];
   insights: ManagerialInsight[];
   root_cause_analysis?: RootCauseAnalysis | null;
+  dimension_narratives?: DimensionNarrative[];
   monthly_comparisons?: ManagerialMonthlyComparison[];
   comparative_summary?: ManagerialComparativeSummary;
   alerts: string[];

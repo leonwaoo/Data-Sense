@@ -73,14 +73,14 @@ export function RootCauseSection({ rootCause }: { rootCause: RootCauseAnalysis |
       {impactRanking.length ? (
         <div className="root-cause-ranking">
           <div>
-            <strong>Ranking de contribuição</strong>
-            <span>Produtos, categorias ou recortes que mais explicam a mudança</span>
+            <strong>Ranking de contribuicao</strong>
+            <span>Recortes que mais explicam a mudanca no periodo analisado</span>
           </div>
           <div className="impact-ranking-list">
             {impactRanking.slice(0, 6).map((item) => (
               <div className="impact-ranking-row" key={`${item.dimension}-${item.name}`}>
                 <span>{item.name}</span>
-                <small>{item.label}</small>
+                <small>{item.label} · {item.recurrence_flag ?? "pontual"}</small>
                 <strong>{formatSignedCell(item.variation)}</strong>
                 <em>{formatPercentCell(item.share_of_abs_change)}</em>
               </div>

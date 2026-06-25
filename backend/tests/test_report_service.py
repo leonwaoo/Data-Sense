@@ -3,6 +3,7 @@ import pandas as pd
 from app.models import DatasetSession
 from app.services.report_service import (
     _managerial_comparative_items,
+    _managerial_dimension_items,
     _managerial_monthly_items,
     _managerial_root_cause_items,
     _period_label,
@@ -28,19 +29,21 @@ def _inventory_dataset() -> DatasetSession:
 
 
 def test_period_label_formats_month_with_order_and_accent() -> None:
-    assert _period_label("2025-03") == "03 Março/2025"
+    assert _period_label("2025-03") == "03 MarÃ§o/2025"
     assert _period_label("Produto A") == "Produto A"
 
 
-def test_report_managerial_items_include_month_labels_and_contribution_ranking() -> None:
+def test_report_managerial_items_include_month_labels_and_dimension_readings() -> None:
     context = build_report_context(_inventory_dataset())
 
     root_items = _managerial_root_cause_items(context)
     monthly_items = _managerial_monthly_items(context)
     comparative_items = _managerial_comparative_items(context)
+    dimension_items = _managerial_dimension_items(context)
 
     assert any("Ultimos 3 meses" in item for item in comparative_items)
-    assert any("03 Março/2025" in item for item in root_items)
+    assert any("03 MarÃ§o/2025" in item for item in root_items)
     assert any("Ranking de contribuicao: Cafe A" in item for item in root_items)
     assert any("Concentracao relevante: Cafe A" in item for item in root_items)
-    assert any(item.startswith("03 Março/2025:") for item in monthly_items)
+    assert any(item.startswith("03 MarÃ§o/2025:") for item in monthly_items)
+    assert any("Produto:" in item or "Categoria:" in item for item in dimension_items)

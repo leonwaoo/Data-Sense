@@ -33,17 +33,20 @@ def test_powerbi_export_includes_dax_layout_and_indicators() -> None:
         layout = package.read("layout_sugerido.csv").decode("utf-8-sig")
         indicators = package.read("indicadores_powerbi.csv").decode("utf-8-sig")
         monthly = package.read("comparativo_mensal.csv").decode("utf-8-sig")
+        dimensions = package.read("leituras_dimensao.csv").decode("utf-8-sig")
 
     assert {
         "medidas_dax.txt",
         "modelo_paginas.json",
         "layout_sugerido.csv",
         "indicadores_powerbi.csv",
+        "leituras_dimensao.csv",
     }.issubset(names)
     assert "Total Metrica = SUM('dados_tratados'[Estoque Total (TON)])" in dax
     assert "Media Movel 3M" in dax
     assert "layout_sugerido.csv" in readme
-    assert "Resumo executivo" in layout
+    assert "Leituras por dimensao" in layout
     assert "Principal contribuinte" in indicators
+    assert "narrativa" in dimensions
     assert "media_movel_3m" in monthly
     assert "acumulado_ano" in monthly

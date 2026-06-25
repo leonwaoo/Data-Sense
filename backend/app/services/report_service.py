@@ -75,12 +75,14 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = _pdf_header(pdf, context, margin, y, width)
     y = _pdf_kpi_cards(pdf, context, margin, y, width)
     y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Diagnostico de variacao", _managerial_variation_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Principais mudancas", _managerial_variation_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Comparativos gerenciais", _managerial_comparative_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Causa raiz gerencial", _managerial_root_cause_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Causa raiz", _managerial_root_cause_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Alertas", _managerial_alert_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Recomendacoes", _managerial_recommendation_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Leituras por dimensao", _managerial_dimension_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Comparativo mes a mes", _managerial_monthly_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Insights gerenciais", _managerial_insight_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Resumo do dataset", _summary_items(context), margin, y, width, height)
     if context.profile.get("date_conversion_suggestions"):
         y = _pdf_section(pdf, "Sugestoes de conversao de datas", _date_suggestion_items(context), margin, y, width, height)
@@ -110,9 +112,11 @@ def build_report_png(dataset: DatasetSession) -> bytes:
             _managerial_variation_items(context),
             _managerial_comparative_items(context),
             _managerial_root_cause_items(context),
+            _managerial_dimension_items(context),
+            _managerial_alert_items(context),
+            _managerial_recommendation_items(context),
             _managerial_monthly_items(context),
             _managerial_insight_items(context),
-            _managerial_action_items(context),
         ]
     )
     canvas_height = (
@@ -139,12 +143,14 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     _png_kpi_cards(draw, context, fonts, x, y)
     y += 150
     y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Diagnostico de variacao", _managerial_variation_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Principais mudancas", _managerial_variation_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Comparativos gerenciais", _managerial_comparative_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Causa raiz gerencial", _managerial_root_cause_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Causa raiz", _managerial_root_cause_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Alertas", _managerial_alert_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Recomendacoes", _managerial_recommendation_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Leituras por dimensao", _managerial_dimension_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Comparativo mes a mes", _managerial_monthly_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Insights gerenciais", _managerial_insight_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Resumo do dataset", _summary_items(context), fonts, x, y, max_width)
     if context.profile.get("date_conversion_suggestions"):
         y = _png_section(draw, "Sugestoes de conversao de datas", _date_suggestion_items(context), fonts, x, y, max_width)
@@ -304,6 +310,22 @@ def _managerial_root_cause_items(context: ReportContext) -> list[str]:
     return items[:10] or ["Sem causa raiz suficiente para exportacao nesta base."]
 
 
+def _managerial_dimension_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    narratives = analysis.get("dimension_narratives") or ((analysis.get("root_cause_analysis") or {}).get("dimension_narratives")) or []
+    items = []
+    for item in narratives[:4]:
+        text = f"{item.get('label')}: {item.get('narrative')}"
+        impact = item.get("managerial_impact")
+        recommendation = item.get("recommendation")
+        if impact:
+            text += f" Impacto: {impact}"
+        if recommendation:
+            text += f" Recomendacao: {recommendation}"
+        items.append(text)
+    return items or ["Sem leituras por dimensao suficientes para exportacao."]
+
+
 def _managerial_monthly_items(context: ReportContext) -> list[str]:
     analysis = context.managerial_analysis or {}
     comparisons = analysis.get("monthly_comparisons") or []
@@ -343,12 +365,16 @@ def _managerial_insight_items(context: ReportContext) -> list[str]:
     return items or ["Sem insights gerenciais suficientes para exportacao."]
 
 
-def _managerial_action_items(context: ReportContext) -> list[str]:
+def _managerial_alert_items(context: ReportContext) -> list[str]:
     analysis = context.managerial_analysis or {}
-    alerts = [f"Alerta: {item}" for item in (analysis.get("alerts") or [])[:4]]
+    return [f"Alerta: {item}" for item in (analysis.get("alerts") or [])[:5]] or ["Nenhum alerta gerencial adicional foi identificado."]
+
+
+def _managerial_recommendation_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
     recommendations = [f"Acao: {item}" for item in (analysis.get("recommendations") or [])[:4]]
     questions = [f"Pergunta sugerida: {item}" for item in (analysis.get("suggested_questions") or [])[:3]]
-    return alerts + recommendations + questions or ["Nenhum alerta gerencial adicional foi identificado."]
+    return recommendations + questions or ["Nenhuma recomendacao gerencial adicional foi identificada."]
 
 
 def _movement_sentence(label: str, movement: dict) -> str:

@@ -89,6 +89,7 @@ def _managerial_evidence_package(dataset: DatasetSession, analysis: dict) -> dic
             "responsible_month": root_cause.get("responsible_month"),
             "primary_contributor": root_cause.get("primary_contributor"),
             "dimension_impact_ranking": root_cause.get("dimension_impact_ranking", [])[:8],
+            "dimension_narratives": analysis.get("dimension_narratives", [])[:4],
             "concentration_alerts": root_cause.get("concentration_alerts", [])[:5],
             "supporting_metrics": root_cause.get("supporting_metrics", [])[:5],
             "confidence": root_cause.get("confidence"),

@@ -123,6 +123,7 @@ def test_managerial_analysis_ranks_dimension_contributors_and_concentration_aler
 
     root_cause = analysis["root_cause_analysis"]
     ranking = root_cause["dimension_impact_ranking"]
+    dimension_narratives = analysis["dimension_narratives"]
     alerts = root_cause["concentration_alerts"]
     driver_labels = {driver["label"] for driver in root_cause["dimension_drivers"]}
 
@@ -130,6 +131,12 @@ def test_managerial_analysis_ranks_dimension_contributors_and_concentration_aler
     assert "Categoria" in driver_labels
     assert ranking[0]["name"] == "Cafe A"
     assert ranking[0]["share_of_abs_change"] >= 0.9
+    assert ranking[0]["concentration_level"] == "alta"
+    assert ranking[0]["recurrence_flag"] in {"recorrente", "pontual"}
+    assert "historical_mean" in ranking[0]
+    assert dimension_narratives
+    assert dimension_narratives[0]["label"] in {"Produto", "Categoria"}
+    assert "managerial_impact" in dimension_narratives[0]
     assert any("Cafe A" in alert for alert in alerts)
     assert any("Cafe A" in alert for alert in analysis["alerts"])
     assert any("mais de 80%" in alert for alert in analysis["alerts"])

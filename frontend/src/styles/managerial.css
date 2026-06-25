@@ -590,6 +590,76 @@
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.dimension-narratives-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dimension-narratives-heading strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.dimension-narratives-heading span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dimension-narratives-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.dimension-narrative-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.dimension-narrative-card > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.dimension-narrative-card strong {
+  font-size: 0.9rem;
+}
+
+.dimension-narrative-card span,
+.dimension-narrative-card small,
+.dimension-narrative-card footer {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.dimension-narrative-card p {
+  color: var(--text-2);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.dimension-narrative-movers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dimension-narrative-movers span {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
 .managerial-insight-card {
   background: var(--surface-2);
   border: 1px solid var(--border);

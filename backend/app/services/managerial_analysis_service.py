@@ -52,6 +52,7 @@ def build_managerial_analysis(dataset: DatasetSession) -> dict:
         "insights": diagnostic["insights"],
         "variations": diagnostic["variations"],
         "root_cause_analysis": diagnostic["root_cause_analysis"],
+        "dimension_narratives": diagnostic["dimension_narratives"],
         "monthly_comparisons": diagnostic["monthly_comparisons"],
         "comparative_summary": diagnostic["comparative_summary"],
         "driver_evidence": diagnostic["driver_evidence"],
@@ -127,6 +128,7 @@ def _build_variation_diagnostic(
     monthly_comparisons = _monthly_comparisons(period_metrics, metric_map, domain)
     comparative_summary = _comparative_summary(period_metrics, primary_metric)
     root_cause_analysis = _root_cause_analysis(prepared, period_metrics, metric_map, dimensions, domain, focus, driver_evidence)
+    dimension_narratives = root_cause_analysis.get("dimension_narratives", [])
     alerts = _deduplicate(
         [
             *_alerts(abnormal_periods, focus, metric_map, period_metrics, root_cause_analysis),
@@ -146,6 +148,7 @@ def _build_variation_diagnostic(
             "trend": _trend_payload(period_metrics),
         },
         "root_cause_analysis": root_cause_analysis,
+        "dimension_narratives": dimension_narratives,
         "monthly_comparisons": monthly_comparisons,
         "comparative_summary": comparative_summary,
         "driver_evidence": driver_evidence,
@@ -161,6 +164,7 @@ def _build_variation_diagnostic(
             },
             "driver_evidence": driver_evidence,
             "root_cause_analysis": root_cause_analysis,
+            "dimension_narratives": dimension_narratives,
             "monthly_comparisons": monthly_comparisons[-12:],
             "comparative_summary": comparative_summary,
             "abnormal_periods": [_movement_payload(row) for _, row in abnormal_periods.head(8).iterrows()],
@@ -203,8 +207,15 @@ def _root_cause_analysis(
     variation_pct = _safe_float(focus.get("variacao_pct"))
     direction = "alta" if (variation or 0) >= 0 else "queda"
 
-    dimension_drivers = _root_dimension_drivers(prepared, dimensions, focus_period, previous_period, variation)
-    dimension_impact_ranking = _dimension_impact_ranking(dimension_drivers)
+    dimension_drivers = _root_dimension_drivers(
+        prepared,
+        dimensions,
+        focus_period,
+        previous_period,
+        variation,
+        period_metrics,
+    )
+    dimension_impact_ranking = _dimension_impact_ranking(dimension_drivers, focus_period)
     concentration_alerts = _dimension_concentration_alerts(dimension_drivers)
     primary_dimension = next((item for item in dimension_drivers if item.get("contributors")), None)
     top_contributor = primary_dimension["contributors"][0] if primary_dimension else None
@@ -224,6 +235,15 @@ def _root_cause_analysis(
         historical_mean,
         historical_delta,
         driver_evidence,
+    )
+    dimension_narratives = _dimension_narratives(
+        dimension_drivers,
+        domain["type"],
+        primary_metric,
+        focus_period,
+        previous_period,
+        variation,
+        variation_pct,
     )
 
     return {
@@ -249,6 +269,7 @@ def _root_cause_analysis(
         "primary_contributor": top_contributor,
         "dimension_drivers": dimension_drivers,
         "dimension_impact_ranking": dimension_impact_ranking,
+        "dimension_narratives": dimension_narratives,
         "concentration_alerts": concentration_alerts,
         "supporting_metrics": driver_evidence[:4],
         "waterfall": waterfall,
@@ -264,6 +285,7 @@ def _root_dimension_drivers(
     focus_period: str,
     previous_period: str | None,
     total_variation: float | None,
+    period_metrics: pd.DataFrame,
 ) -> list[dict]:
     drivers = []
     if not previous_period:
@@ -288,9 +310,21 @@ def _root_dimension_drivers(
             continue
 
         comparison["variation"] = comparison["current_value"] - comparison["previous_value"]
+        comparison["variation_pct_vs_previous"] = comparison.apply(
+            lambda row: _safe_pct(row["variation"], row["previous_value"]),
+            axis=1,
+        )
         abs_total = comparison["variation"].abs().sum()
         comparison["share_of_abs_change"] = comparison["variation"].abs() / abs_total if abs_total else 0
         comparison["share_of_total_change"] = comparison["variation"] / total_variation if total_variation else None
+        history = _dimension_history(prepared, column)
+        comparison = comparison.merge(history, on="name", how="left")
+        comparison["historical_delta"] = comparison["current_value"] - comparison["historical_mean"]
+        comparison["concentration_level"] = comparison["share_of_abs_change"].apply(_concentration_level)
+        comparison["recurrence_flag"] = comparison.apply(
+            lambda row: _recurrence_flag(prepared, column, str(row["name"]), focus_period),
+            axis=1,
+        )
         comparison = comparison.sort_values("variation", key=lambda values: values.abs(), ascending=False)
         contributors = [
             {
@@ -298,8 +332,13 @@ def _root_dimension_drivers(
                 "current_value": _round_or_none(row["current_value"]),
                 "previous_value": _round_or_none(row["previous_value"]),
                 "variation": _round_or_none(row["variation"]),
+                "variation_pct_vs_previous": _round_or_none(row["variation_pct_vs_previous"]),
                 "share_of_abs_change": _round_or_none(row["share_of_abs_change"]),
                 "share_of_total_change": _round_or_none(row["share_of_total_change"]),
+                "historical_mean": _round_or_none(row["historical_mean"]),
+                "historical_delta": _round_or_none(row["historical_delta"]),
+                "concentration_level": row["concentration_level"],
+                "recurrence_flag": row["recurrence_flag"],
             }
             for _, row in comparison.head(8).iterrows()
         ]
@@ -315,7 +354,7 @@ def _root_dimension_drivers(
     return drivers
 
 
-def _dimension_impact_ranking(dimension_drivers: list[dict]) -> list[dict]:
+def _dimension_impact_ranking(dimension_drivers: list[dict], focus_period: str) -> list[dict]:
     ranking = []
     for driver in dimension_drivers:
         for contributor in driver.get("contributors", [])[:5]:
@@ -331,15 +370,209 @@ def _dimension_impact_ranking(dimension_drivers: list[dict]) -> list[dict]:
                     "current_value": contributor.get("current_value"),
                     "previous_value": contributor.get("previous_value"),
                     "variation": _round_or_none(variation),
+                    "variation_pct_vs_previous": contributor.get("variation_pct_vs_previous"),
                     "share_of_abs_change": _round_or_none(share_abs),
                     "share_of_total_change": contributor.get("share_of_total_change"),
+                    "historical_mean": contributor.get("historical_mean"),
+                    "historical_delta": contributor.get("historical_delta"),
+                    "concentration_level": contributor.get("concentration_level"),
+                    "recurrence_flag": contributor.get("recurrence_flag"),
                     "reading": (
                         f"{contributor.get('name')} em {driver.get('label')} respondeu por "
-                        f"{_format_pct(share_abs)} da variacao absoluta analisada."
+                        f"{_format_pct(share_abs)} da variacao absoluta em {focus_period}, com "
+                        f"{contributor.get('recurrence_flag', 'peso pontual')} e concentracao "
+                        f"{contributor.get('concentration_level', 'baixa')}."
                     ),
                 }
             )
-    return sorted(ranking, key=lambda item: abs(_safe_float(item.get("variation")) or 0), reverse=True)[:12]
+    ranking.sort(
+        key=lambda item: (
+            abs(_safe_float(item.get("share_of_abs_change")) or 0),
+            abs(_safe_float(item.get("variation")) or 0),
+            abs(_safe_float(item.get("historical_delta")) or 0),
+        ),
+        reverse=True,
+    )
+    return ranking[:12]
+
+
+def _dimension_history(prepared: pd.DataFrame, column: str) -> pd.DataFrame:
+    grouped = (
+        prepared.groupby(["_periodo", column], as_index=False)["_valor_principal"]
+        .sum()
+        .rename(columns={column: "name", "_valor_principal": "value"})
+    )
+    if grouped.empty:
+        return pd.DataFrame(columns=["name", "historical_mean"])
+    history = grouped.groupby("name", as_index=False)["value"].mean().rename(columns={"value": "historical_mean"})
+    history["name"] = history["name"].astype(str)
+    return history
+
+
+def _recurrence_flag(prepared: pd.DataFrame, column: str, name: str, focus_period: str) -> str:
+    grouped = (
+        prepared.groupby(["_periodo", column], as_index=False)["_valor_principal"]
+        .sum()
+        .rename(columns={column: "name", "_valor_principal": "value"})
+    )
+    if grouped.empty:
+        return "pontual"
+    pivot = grouped.pivot(index="_periodo", columns="name", values="value").fillna(0).sort_index()
+    if name not in pivot.columns:
+        return "pontual"
+    recent = pivot.diff().abs().dropna()
+    if recent.empty:
+        return "pontual"
+    relevant_periods = [period for period in recent.index if period <= focus_period][-3:]
+    appearances = 0
+    for period in relevant_periods:
+        period_row = recent.loc[period].sort_values(ascending=False).head(3)
+        if name in period_row.index:
+            appearances += 1
+    return "recorrente" if appearances >= 2 else "pontual"
+
+
+def _concentration_level(share_abs: float | None) -> str:
+    value = share_abs or 0
+    if value >= 0.8:
+        return "alta"
+    if value >= 0.6:
+        return "media"
+    return "baixa"
+
+
+def _safe_pct(delta: Any, base: Any) -> float | None:
+    delta_value = _safe_float(delta)
+    base_value = _safe_float(base)
+    if delta_value is None or base_value in (None, 0):
+        return None
+    return delta_value / abs(base_value)
+
+
+def _dimension_narrative_text(
+    domain_type: str,
+    dimension_label: str,
+    primary_metric: str,
+    focus_period: str,
+    previous_period: str | None,
+    top: dict,
+    total_variation: float | None,
+    total_variation_pct: float | None,
+) -> str:
+    name = top.get("name") or "recorte principal"
+    variation = _format_signed_number(top.get("variation"))
+    variation_pct = _format_pct(_safe_float(top.get("variation_pct_vs_previous")))
+    share = _format_pct(_safe_float(top.get("share_of_abs_change")))
+    base = (
+        f"Em {focus_period}, {name} foi o principal vetor em {dimension_label}: "
+        f"{variation} em {primary_metric} contra {previous_period or 'o periodo anterior'} "
+        f"({variation_pct}), respondendo por {share} da variacao absoluta."
+    )
+    if domain_type == "estoque_operacao":
+        return (
+            f"{base} A leitura sugere concentracao operacional entre consumo, reposicao, transferencia "
+            f"ou ruptura de estoque nesse recorte."
+        )
+    if domain_type == "vendas":
+        return f"{base} O movimento aponta mudanca de mix, cliente ou canal com impacto comercial direto."
+    if domain_type == "compras":
+        return f"{base} O sinal e compativel com dependencia de fornecedor, item critico ou variacao de prazo/custo."
+    if domain_type == "financeiro":
+        return f"{base} O desvio merece validacao em centros de custo, contas ou eventos nao recorrentes."
+    overall = _format_signed_number(total_variation)
+    overall_pct = _format_pct(total_variation_pct)
+    return f"{base} No consolidado, a serie teve {overall} ({overall_pct}), entao esse recorte merece verificacao gerencial."
+
+
+def _dimension_managerial_impact(domain_type: str, top: dict, share_abs: float) -> str:
+    name = top.get("name") or "recorte principal"
+    if domain_type == "estoque_operacao":
+        return f"{name} pode concentrar risco de ruptura, excesso localizado ou transferencia sem compensacao."
+    if domain_type == "vendas":
+        return f"{name} concentra parte relevante do resultado comercial e pode distorcer o mix mensal."
+    if domain_type == "compras":
+        return f"{name} pode elevar dependencia operacional e pressionar custo ou prazo."
+    if share_abs >= 0.8:
+        return f"{name} domina a mudanca e deve ser validado antes de generalizar conclusoes para toda a base."
+    return f"{name} ajuda a explicar a mudanca e orienta o foco inicial da investigacao."
+
+
+def _dimension_possible_causes(domain_type: str, top: dict, share_abs: float) -> list[str]:
+    name = top.get("name") or "recorte principal"
+    common = [f"{name} concentrou {_format_pct(share_abs)} da variacao absoluta no periodo."]
+    if domain_type == "estoque_operacao":
+        return common + ["Validar consumo elevado, reposicao atrasada, transferencia ou ajuste de estoque."]
+    if domain_type == "vendas":
+        return common + ["Revisar mix, carteira, campanha, canal ou perda de volume nesse recorte."]
+    if domain_type == "compras":
+        return common + ["Verificar dependencia de fornecedor, atraso, renegociacao ou mudanca de item."]
+    return common + ["Checar classificacao contabil, evento pontual ou mudanca concentrada em poucas entidades."]
+
+
+def _dimension_recommendation(domain_type: str, dimension_label: str, top: dict, share_abs: float) -> str:
+    name = top.get("name") or "recorte principal"
+    if domain_type == "estoque_operacao":
+        return f"Validar movimentacoes de {name} em {dimension_label}, incluindo consumo, reposicao e transferencias do periodo."
+    if domain_type == "vendas":
+        return f"Revisar carteira e mix de {name} em {dimension_label}, comparando canal, cliente e ticket contra a media recente."
+    if domain_type == "compras":
+        return f"Auditar {name} em {dimension_label} com foco em prazo, custo e dependencia operacional."
+    if share_abs >= 0.8:
+        return f"Priorize {name} em {dimension_label}; ele sozinho explica a maior parte da mudanca."
+    return f"Investigue {name} em {dimension_label} antes de expandir a leitura para os demais recortes."
+
+
+def _dimension_narratives(
+    dimension_drivers: list[dict],
+    domain_type: str,
+    primary_metric: str,
+    focus_period: str,
+    previous_period: str | None,
+    total_variation: float | None,
+    total_variation_pct: float | None,
+) -> list[dict]:
+    narratives = []
+    for driver in dimension_drivers[:4]:
+        contributors = driver.get("contributors") or []
+        if not contributors:
+            continue
+        top = contributors[0]
+        share = _safe_float(top.get("share_of_abs_change")) or 0
+        historical_delta = _safe_float(top.get("historical_delta"))
+        historical_mean = _safe_float(top.get("historical_mean"))
+        narratives.append(
+            {
+                "dimension": driver.get("dimension"),
+                "label": driver.get("label"),
+                "top_movers": contributors[:3],
+                "share_concentration": {
+                    "top_1": _round_or_none(share),
+                    "top_3": _round_or_none(sum((_safe_float(item.get("share_of_abs_change")) or 0) for item in contributors[:3])),
+                    "level": _concentration_level(share),
+                },
+                "historical_comparison": {
+                    "historical_mean": _round_or_none(historical_mean),
+                    "historical_delta": _round_or_none(historical_delta),
+                    "historical_delta_pct": _round_or_none(
+                        historical_delta / abs(historical_mean) if historical_delta is not None and historical_mean else None
+                    ),
+                },
+                "narrative": _dimension_narrative_text(
+                    domain_type,
+                    driver.get("label") or driver.get("dimension"),
+                    primary_metric,
+                    focus_period,
+                    previous_period,
+                    top,
+                    total_variation,
+                    total_variation_pct,
+                ),
+                "managerial_impact": _dimension_managerial_impact(domain_type, top, share),
+                "possible_causes": _dimension_possible_causes(domain_type, top, share),
+                "recommendation": _dimension_recommendation(domain_type, driver.get("label") or driver.get("dimension"), top, share),
+            }
+        )
+    return narratives[:4]
 
 
 def _dimension_concentration_alerts(dimension_drivers: list[dict]) -> list[str]:
@@ -859,6 +1092,7 @@ def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) ->
         ],
         "variations": {},
         "root_cause_analysis": None,
+        "dimension_narratives": [],
         "monthly_comparisons": [],
         "comparative_summary": {"cards": [], "readings": []},
         "driver_evidence": [],
@@ -891,6 +1125,7 @@ def _empty_diagnostic(metric_map: dict, domain: dict, reason: str) -> dict:
         "insights": [insight],
         "variations": {},
         "root_cause_analysis": None,
+        "dimension_narratives": [],
         "monthly_comparisons": [],
         "comparative_summary": {"cards": [], "readings": []},
         "driver_evidence": [],

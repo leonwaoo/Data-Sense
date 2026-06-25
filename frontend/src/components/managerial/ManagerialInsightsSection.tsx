@@ -18,6 +18,7 @@ export function ManagerialInsightsSection({
   const primaryMetric = analysis.context.metric_map.primary_metric ?? "Metrica nao detectada";
   const supportMetrics = Object.values(analysis.context.metric_map.support_metrics);
   const rootCause = analysis.root_cause_analysis ?? null;
+  const dimensionNarratives = analysis.dimension_narratives ?? rootCause?.dimension_narratives ?? [];
   const aiStatusLabel = aiReview?.ai_status === "completed"
     ? `IA ${aiReview.model ?? "ativa"}`
     : aiReview?.ai_status === "not_configured"
@@ -145,6 +146,37 @@ export function ManagerialInsightsSection({
       ) : null}
 
       <RootCauseSection rootCause={rootCause} />
+
+      {dimensionNarratives.length ? (
+        <div className="dimension-narratives-panel">
+          <div className="dimension-narratives-heading">
+            <div>
+              <strong>Leituras por dimensao</strong>
+              <span>Onde mudou, quem puxou e o que merece validacao gerencial</span>
+            </div>
+          </div>
+          <div className="dimension-narratives-grid">
+            {dimensionNarratives.slice(0, 4).map((item) => (
+              <article className="dimension-narrative-card" key={item.dimension}>
+                <div>
+                  <strong>{item.label}</strong>
+                  <span>{item.share_concentration.level} concentracao</span>
+                </div>
+                <p>{item.narrative}</p>
+                <small>{item.managerial_impact}</small>
+                <div className="dimension-narrative-movers">
+                  {(item.top_movers ?? []).slice(0, 3).map((mover) => (
+                    <span key={`${item.dimension}-${mover.name}`}>
+                      {mover.name}: {mover.variation ?? 0}
+                    </span>
+                  ))}
+                </div>
+                {item.recommendation ? <footer>{item.recommendation}</footer> : null}
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="managerial-insight-grid">
         {analysis.insights.slice(0, 4).map((insight) => (

@@ -1,10 +1,15 @@
 import re
-import unicodedata
+from functools import partial
 
 import duckdb
 import pandas as pd
 
 from app.models import DatasetSession
+from app.services.column_heuristics import (
+    is_metric_noise,
+    looks_like_identifier as _looks_like_identifier,
+    normalize_text_for_search as _normalize_text,
+)
 from app.services.date_utils import parse_common_dates
 
 SALES_CANDIDATES = [
@@ -54,6 +59,7 @@ METRIC_NOISE_TERMS = [
 ]
 NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento", "ajuste", "abatimento"]
 NEGATIVE_ALLOWED_TERMS = ["lucro", "margem", "saldo"]
+_is_metric_noise = partial(is_metric_noise, terms=METRIC_NOISE_TERMS)
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 GROUP_CANDIDATES = [
     ("produto", ["produto", "item", "sku", "servico", "produto_servico"]),
@@ -346,17 +352,6 @@ def _find_column(columns, candidates: list[str]) -> str | None:
     return None
 
 
-def _looks_like_identifier(column: str) -> bool:
-    normalized = _normalize_text(column).replace(" ", "_")
-    identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
-
-
-def _is_metric_noise(column: str) -> bool:
-    normalized = _normalize_text(column).replace(" ", "_")
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
-
-
 def _is_adjustment_metric(column: str) -> bool:
     normalized = _normalize_text(column).replace(" ", "_")
     return any(term in normalized for term in NEGATIVE_METRIC_TERMS)
@@ -368,10 +363,3 @@ def _quote_identifier(column: str) -> str:
 
 def _empty_answer(message: str) -> dict:
     return {"answer": message, "calculation": None, "table": [], "chart": None}
-
-
-def _normalize_text(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value))
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    text = re.sub(r"[^a-zA-Z0-9_]+", " ", text.lower())
-    return re.sub(r"\s+", " ", text).strip()

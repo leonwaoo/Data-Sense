@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from io import BytesIO
 from math import ceil
 from pathlib import Path
@@ -17,10 +18,13 @@ from reportlab.pdfgen import canvas
 from app.models import DatasetSession
 from app.services.dashboard_service import build_dashboard
 from app.services.chart_service import suggest_charts
+from app.services.column_heuristics import format_number
 from app.services.date_utils import parse_common_dates
 from app.services.managerial_analysis_service import build_managerial_analysis
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
+
+_format_number = partial(format_number, none_text="n/d", compact_large=True)
 
 
 @dataclass(frozen=True)
@@ -851,23 +855,6 @@ def _safe_chart_values(values: list[float]) -> list[float]:
 
 def _label_step(length: int, target: int) -> int:
     return max(1, ceil(length / max(target, 1)))
-
-
-def _format_number(value: object) -> str:
-    try:
-        if pd.isna(value):
-            return "n/d"
-    except (TypeError, ValueError):
-        pass
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return "n/d"
-    if abs(parsed) >= 1000:
-        return f"{parsed:,.0f}".replace(",", ".")
-    if parsed == int(parsed):
-        return str(int(parsed))
-    return f"{parsed:.2f}".replace(".", ",")
 
 
 def _format_signed_number(value: object) -> str:

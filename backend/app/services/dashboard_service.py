@@ -1,9 +1,17 @@
 import re
 import unicodedata
+from functools import partial
 
 import pandas as pd
 
 from app.models import DatasetSession
+from app.services.column_heuristics import (
+    format_number as _format_number,
+    is_metric_noise,
+    looks_like_identifier as _looks_like_identifier,
+    normalize_text as _normalize_text,
+    slug as _slug,
+)
 from app.services.date_utils import parse_common_dates
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
@@ -55,6 +63,7 @@ METRIC_NOISE_TERMS = [
 ]
 NEGATIVE_METRIC_TERMS = ["desconto", "devolucao", "estorno", "cancelamento", "ajuste", "abatimento"]
 NEGATIVE_ALLOWED_TERMS = ["lucro", "margem", "saldo"]
+_is_metric_noise = partial(is_metric_noise, terms=METRIC_NOISE_TERMS)
 QUANTITY_CANDIDATES = ["quantidade", "qtd", "volume", "unidade", "unidades", "units"]
 DATE_CANDIDATES = ["data", "date", "mes", "month", "dia", "periodo", "competencia"]
 DIMENSION_CANDIDATES = [
@@ -629,17 +638,6 @@ def _first_matching(columns: list[str], candidates: list[str]) -> str | None:
     return None
 
 
-def _looks_like_identifier(column: str) -> bool:
-    normalized = _normalize_text(column)
-    identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
-
-
-def _is_metric_noise(column: str) -> bool:
-    normalized = _normalize_text(column)
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
-
-
 def _is_adjustment_metric(column: str) -> bool:
     normalized = _normalize_text(column)
     return any(term in normalized for term in NEGATIVE_METRIC_TERMS)
@@ -655,20 +653,6 @@ def _quality_label(score: int) -> str:
     return "Base critica para analise"
 
 
-def _format_number(value) -> str:
-    if isinstance(value, float) and value.is_integer():
-        value = int(value)
-    if isinstance(value, int):
-        return f"{value:,}".replace(",", ".")
-    if isinstance(value, float):
-        return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return str(value)
-
-
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", _normalize_text(value)).strip("_")
-
-
 def _display_label(value: str, limit: int = 64) -> str:
     text = unicodedata.normalize("NFKD", str(value))
     text = "".join(character for character in text if not unicodedata.category(character).startswith("C"))
@@ -677,10 +661,3 @@ def _display_label(value: str, limit: int = 64) -> str:
     if len(text) <= limit:
         return text
     return f"{text[: max(limit - 3, 1)].rstrip()}..."
-
-
-def _normalize_text(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value))
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower())
-    return re.sub(r"_+", "_", text).strip("_")

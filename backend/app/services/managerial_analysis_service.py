@@ -1,12 +1,21 @@
 import re
-import unicodedata
+from functools import partial
 from typing import Any
 
 import pandas as pd
 
 from app.models import DatasetSession
-from app.services.date_utils import parse_common_dates
+from app.services.column_heuristics import (
+    format_number,
+    looks_like_identifier,
+    normalize_text as _normalize_text,
+    strip_accents as _strip_accents,
+)
+from app.services.date_utils import MONTH_ALIASES, parse_common_dates
 from app.services.profile_service import build_profile
+
+_format_number = partial(format_number, none_text="n/d", compact_large=True)
+_looks_like_identifier = partial(looks_like_identifier, terms=("id", "codigo", "cod", "sku", "nf"))
 
 
 DOMAIN_RULES = [
@@ -61,29 +70,6 @@ DOMAIN_RULES = [
 TIME_TERMS = ["data", "date", "periodo", "competencia", "mes", "month", "ano", "year"]
 YEAR_TERMS = ["ano", "year", "exercicio"]
 MONTH_TERMS = ["mes", "month", "competencia"]
-MONTH_ALIASES = {
-    "jan": 1,
-    "fev": 2,
-    "feb": 2,
-    "mar": 3,
-    "abr": 4,
-    "apr": 4,
-    "mai": 5,
-    "may": 5,
-    "jun": 6,
-    "jul": 7,
-    "ago": 8,
-    "aug": 8,
-    "set": 9,
-    "sep": 9,
-    "out": 10,
-    "oct": 10,
-    "nov": 11,
-    "dez": 12,
-    "dec": 12,
-}
-
-
 def build_managerial_analysis(dataset: DatasetSession) -> dict:
     df = dataset.dataframe.copy()
     profile = build_profile(dataset)
@@ -795,18 +781,6 @@ def _map_metrics(df: pd.DataFrame, profile: dict, domain: dict) -> dict:
 
 
 def _build_time_context(df: pd.DataFrame, profile: dict) -> dict:
-    for column in profile["datetime_columns"]:
-        parsed = parse_common_dates(df[column])
-        if parsed.notna().mean() >= 0.6:
-            return {"available": True, "label": column, "columns": [column], "series": parsed}
-
-    for candidate in profile.get("date_candidates", []):
-        column = candidate.get("column")
-        if column in df.columns:
-            parsed = parse_common_dates(df[column])
-            if parsed.notna().mean() >= 0.6:
-                return {"available": True, "label": column, "columns": [column], "series": parsed}
-
     year_column = _first_matching(profile["column_names"], YEAR_TERMS)
     month_column = _first_matching([column for column in profile["column_names"] if column != year_column], MONTH_TERMS)
     if year_column and month_column:
@@ -818,6 +792,18 @@ def _build_time_context(df: pd.DataFrame, profile: dict) -> dict:
                 "columns": [year_column, month_column],
                 "series": parsed,
             }
+
+    for column in profile["datetime_columns"]:
+        parsed = parse_common_dates(df[column])
+        if parsed.notna().mean() >= 0.6:
+            return {"available": True, "label": column, "columns": [column], "series": parsed}
+
+    for candidate in profile.get("date_candidates", []):
+        column = candidate.get("column")
+        if column in df.columns:
+            parsed = parse_common_dates(df[column])
+            if parsed.notna().mean() >= 0.6:
+                return {"available": True, "label": column, "columns": [column], "series": parsed}
 
     return {"available": False, "label": None, "columns": [], "series": pd.Series(pd.NaT, index=df.index)}
 
@@ -1312,22 +1298,6 @@ def _is_additive_support(group_name: str) -> bool:
     return group_name not in {"custo", "prazo", "margem"}
 
 
-def _looks_like_identifier(column: str) -> bool:
-    normalized = _normalize_text(column)
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in ["id", "codigo", "cod", "sku", "nf"])
-
-
-def _format_number(value: Any) -> str:
-    parsed = _safe_float(value)
-    if parsed is None:
-        return "n/d"
-    if abs(parsed) >= 1000:
-        return f"{parsed:,.0f}".replace(",", ".")
-    if parsed == int(parsed):
-        return str(int(parsed))
-    return f"{parsed:.2f}".replace(".", ",")
-
-
 def _format_signed_number(value: float | None) -> str:
     if value is None:
         return "n/d"
@@ -1351,14 +1321,3 @@ def _deduplicate(values: list[str]) -> list[str]:
         seen.add(key)
         result.append(value)
     return result
-
-
-def _strip_accents(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value))
-    return "".join(character for character in text if not unicodedata.combining(character))
-
-
-def _normalize_text(value: str) -> str:
-    text = _strip_accents(str(value))
-    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower())
-    return re.sub(r"_+", "_", text).strip("_")

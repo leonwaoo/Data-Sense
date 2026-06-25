@@ -2,15 +2,22 @@ import json
 import math
 import os
 import re
-import unicodedata
 import urllib.error
 import urllib.request
 from collections.abc import Iterable
+from functools import partial
 from typing import Any
 
 import pandas as pd
 
 from app.models import DatasetSession
+from app.services.column_heuristics import (
+    format_number as _format_number,
+    is_metric_noise,
+    looks_like_identifier as _looks_like_identifier,
+    normalize_text as _normalize_text,
+    slug as _slug,
+)
 from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
@@ -56,6 +63,7 @@ BUSINESS_VALUE_TERMS = {
 NEGATIVE_ALLOWED_TERMS = {"desconto", "devolucao", "estorno", "cancelamento", "saldo", "lucro", "margem"}
 DATE_DOMAIN_TYPES = {"vendas", "compras", "clientes", "financeiro"}
 SEVERITY_PENALTIES = {"critical": 18, "warning": 9, "info": 3}
+_is_metric_noise = partial(is_metric_noise, terms=METRIC_NOISE_TERMS)
 
 
 def build_quality_audit(dataset: DatasetSession) -> dict:
@@ -843,35 +851,3 @@ def _clamp_int(value: Any, minimum: int, maximum: int, fallback: int) -> int:
 def _is_generic_column(column: str) -> bool:
     normalized = _normalize_text(column)
     return bool(re.fullmatch(r"coluna_\d+", normalized) or normalized.startswith("unnamed"))
-
-
-def _looks_like_identifier(column: str) -> bool:
-    normalized = _normalize_text(column)
-    identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
-
-
-def _is_metric_noise(column: str) -> bool:
-    normalized = _normalize_text(column)
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in METRIC_NOISE_TERMS)
-
-
-def _slug(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", _normalize_text(value)).strip("_")
-
-
-def _normalize_text(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value))
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower())
-    return re.sub(r"_+", "_", text).strip("_")
-
-
-def _format_number(value: Any) -> str:
-    if isinstance(value, float) and value.is_integer():
-        value = int(value)
-    if isinstance(value, int):
-        return f"{value:,}".replace(",", ".")
-    if isinstance(value, float):
-        return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return str(value)

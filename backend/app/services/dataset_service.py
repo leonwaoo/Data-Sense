@@ -1,6 +1,5 @@
 import csv
 import re
-import unicodedata
 import warnings
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -11,6 +10,8 @@ import pandas as pd
 from fastapi import HTTPException
 
 from app.models import DatasetSession
+from app.services.column_heuristics import looks_like_identifier as _looks_like_identifier
+from app.services.column_heuristics import normalize_text as _normalize_text
 
 MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".csv", ".tsv", ".txt", ".xlsx", ".xls", ".json"}
@@ -419,12 +420,6 @@ def _is_text_like(series: pd.Series) -> bool:
     return pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series)
 
 
-def _looks_like_identifier(column: str) -> bool:
-    normalized = _normalize_text(column)
-    identifier_terms = ("id", "codigo", "cod", "sku", "cpf", "cnpj", "cep", "telefone", "phone")
-    return any(term == normalized or normalized.startswith(f"{term}_") or normalized.endswith(f"_{term}") for term in identifier_terms)
-
-
 def _looks_like_number(value: str) -> bool:
     return pd.notna(pd.to_numeric(_normalize_number(value), errors="coerce"))
 
@@ -521,10 +516,3 @@ def _normalize_number(value):
         return text.replace(".", "")
 
     return text
-
-
-def _normalize_text(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value))
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower())
-    return re.sub(r"_+", "_", text).strip("_")

@@ -1,10 +1,10 @@
 import re
-import unicodedata
 
 import pandas as pd
 from pandas import Series
 
 from app.models import DatasetSession
+from app.services.column_heuristics import normalize_text as _normalize_text
 from app.services.date_utils import date_parse_ratio, parse_common_dates
 
 
@@ -165,10 +165,3 @@ def _looks_like_unix_timestamp(value: str) -> bool:
     except (TypeError, ValueError):
         return False
     return 946684800 <= number <= 4102444800 or 946684800000 <= number <= 4102444800000
-
-
-def _normalize_text(value: str) -> str:
-    text = unicodedata.normalize("NFKD", str(value))
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower())
-    return re.sub(r"_+", "_", text).strip("_")

@@ -4,51 +4,63 @@ from typing import Any
 
 import pandas as pd
 
+from app.services.column_heuristics import strip_accents
+
 MONTH_ALIASES = {
     "jan": 1,
     "janeiro": 1,
+    "january": 1,
     "feb": 2,
     "fev": 2,
     "fevereiro": 2,
+    "february": 2,
     "mar": 3,
     "marco": 3,
-    "marco": 3,
+    "march": 3,
     "apr": 4,
     "abr": 4,
     "abril": 4,
+    "april": 4,
     "may": 5,
     "mai": 5,
     "maio": 5,
     "jun": 6,
     "junho": 6,
+    "june": 6,
     "jul": 7,
     "julho": 7,
+    "july": 7,
     "aug": 8,
     "ago": 8,
     "agosto": 8,
+    "august": 8,
     "sep": 9,
     "set": 9,
     "setembro": 9,
+    "september": 9,
     "oct": 10,
     "out": 10,
     "outubro": 10,
+    "october": 10,
     "nov": 11,
     "novembro": 11,
+    "november": 11,
     "dec": 12,
     "dez": 12,
     "dezembro": 12,
+    "december": 12,
 }
 
 
 def parse_common_dates(series: pd.Series) -> pd.Series:
     values = series if isinstance(series, pd.Series) else pd.Series(series)
-    parsed = _best_pandas_datetime(values)
+    parsed = values.map(_parse_period_text)
     missing_mask = parsed.isna()
     if not missing_mask.any():
         return parsed
 
-    period_dates = values[missing_mask].map(_parse_period_text)
-    parsed.loc[missing_mask] = period_dates
+    pandas_dates = _best_pandas_datetime(values[missing_mask])
+    parsed.loc[missing_mask] = pandas_dates
     missing_mask = parsed.isna()
     if not missing_mask.any():
         return parsed
@@ -90,20 +102,7 @@ def _parse_period_text(value: Any):
     if not text:
         return pd.NaT
 
-    normalized = (
-        text.replace("ç", "c")
-        .replace("á", "a")
-        .replace("à", "a")
-        .replace("â", "a")
-        .replace("ã", "a")
-        .replace("é", "e")
-        .replace("ê", "e")
-        .replace("í", "i")
-        .replace("ó", "o")
-        .replace("ô", "o")
-        .replace("õ", "o")
-        .replace("ú", "u")
-    )
+    normalized = strip_accents(text)
 
     match = re.fullmatch(r"(\d{4})[/-](\d{1,2})", normalized)
     if match:
@@ -122,6 +121,12 @@ def _parse_period_text(value: Any):
         month = MONTH_ALIASES.get(match.group(1)[:3], MONTH_ALIASES.get(match.group(1)))
         year = _normalize_year(match.group(2))
         return _timestamp_from_year_month(year, month) if month else pd.NaT
+
+    match = re.fullmatch(r"\d{1,2}[\s_/-]*([a-z]{3,12})", normalized)
+    if match:
+        month_text = match.group(1)
+        month = MONTH_ALIASES.get(month_text[:3], MONTH_ALIASES.get(month_text))
+        return _timestamp_from_year_month(2000, month) if month else pd.NaT
 
     match = re.fullmatch(r"(\d{4})[\s_/-]*(?:q|t|tri|trim)([1-4])", normalized)
     if match:

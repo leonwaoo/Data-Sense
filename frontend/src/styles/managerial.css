@@ -99,6 +99,43 @@
   font-size: 0.78rem;
 }
 
+.monthly-selector {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+
+.monthly-selector button {
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px;
+  text-align: left;
+}
+
+.monthly-selector button:hover,
+.monthly-selector button.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.monthly-selector span {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.monthly-selector strong {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .monthly-focus-body {
   display: grid;
   gap: 16px;
@@ -182,6 +219,15 @@
 .monthly-simple-table td:last-child {
   color: var(--muted);
   max-width: 320px;
+}
+
+.monthly-simple-table tbody tr {
+  cursor: pointer;
+}
+
+.monthly-simple-table tbody tr:hover,
+.monthly-simple-table tbody tr.is-selected {
+  background: var(--accent-soft);
 }
 
 /* Managerial */

@@ -1,15 +1,48 @@
 import { Clock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatNumberCell, formatPercentCell, formatSignedCell } from "../../utils/format";
 import type { ManagerialAnalysis, ManagerialMonthlyComparison } from "../../types";
 
+const monthNames = [
+  "janeiro",
+  "fevereiro",
+  "marco",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+function formatMonthLabel(period: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!match) return period;
+  const monthNumber = Number(match[2]);
+  const monthName = monthNames[monthNumber - 1];
+  return monthName ? `${match[2]} ${monthName}` : period;
+}
+
 export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnalysis }) {
   const monthlyComparisons = analysis.monthly_comparisons ?? [];
-  if (!monthlyComparisons.length) return null;
+  const latest = monthlyComparisons[monthlyComparisons.length - 1];
+  const [selectedPeriod, setSelectedPeriod] = useState(latest?.period ?? "");
+
+  useEffect(() => {
+    if (latest?.period) {
+      setSelectedPeriod(latest.period);
+    }
+  }, [latest?.period]);
+
+  if (!monthlyComparisons.length || !latest) return null;
 
   const metric = analysis.context.metric_map.primary_metric ?? "Metrica principal";
   const visibleMonths = monthlyComparisons.slice(-12);
-  const latest = monthlyComparisons[monthlyComparisons.length - 1];
+  const selectedMonth = visibleMonths.find((item) => item.period === selectedPeriod) ?? latest;
   const movements = monthlyComparisons.filter((item) => typeof item.variation === "number" && Number.isFinite(item.variation));
   const biggestIncrease = movements.reduce<ManagerialMonthlyComparison | null>(
     (best, item) => (!best || (item.variation ?? 0) > (best.variation ?? 0) ? item : best),
@@ -33,22 +66,36 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
           <Clock size={20} />
           <div>
             <h2>Acompanhamento mes a mes</h2>
-            <span>{metric} nos ultimos {visibleMonths.length} periodo(s)</span>
+            <span>{metric} - foco em {formatMonthLabel(selectedMonth.period)}</span>
           </div>
         </div>
-        <span className={`monthly-status severity-${latest.severity}`}>{latest.status}</span>
+        <span className={`monthly-status severity-${selectedMonth.severity}`}>{selectedMonth.status}</span>
+      </div>
+
+      <div className="monthly-selector" aria-label="Selecionar mes para analise">
+        {visibleMonths.map((item) => (
+          <button
+            className={item.period === selectedMonth.period ? "is-selected" : ""}
+            key={item.period}
+            onClick={() => setSelectedPeriod(item.period)}
+            type="button"
+          >
+            <span>{formatMonthLabel(item.period)}</span>
+            <strong>{formatSignedCell(item.variation)}</strong>
+          </button>
+        ))}
       </div>
 
       <div className="monthly-focus-kpis">
         <article>
-          <span>Periodo atual</span>
-          <strong>{latest.period}</strong>
-          <small>{formatNumberCell(latest.value)}</small>
+          <span>Mes selecionado</span>
+          <strong>{formatMonthLabel(selectedMonth.period)}</strong>
+          <small>{formatNumberCell(selectedMonth.value)}</small>
         </article>
         <article>
           <span>Variacao mensal</span>
-          <strong>{formatSignedCell(latest.variation)}</strong>
-          <small>{formatPercentCell(latest.variation_pct)}</small>
+          <strong>{formatSignedCell(selectedMonth.variation)}</strong>
+          <small>{formatPercentCell(selectedMonth.variation_pct)}</small>
         </article>
         <article>
           <span>Maior alta</span>
@@ -80,9 +127,9 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
         </div>
 
         <div className="monthly-reading-card">
-          <strong>Leitura do mes</strong>
-          <p>{latest.managerial_reading}</p>
-          {latest.main_driver ? <span>{latest.main_driver.reading}</span> : null}
+          <strong>Leitura de {formatMonthLabel(selectedMonth.period)}</strong>
+          <p>{selectedMonth.managerial_reading}</p>
+          {selectedMonth.main_driver ? <span>{selectedMonth.main_driver.reading}</span> : null}
           {abnormalMonths.length ? <small>{abnormalMonths.length} periodo(s) exigem atencao.</small> : <small>Nenhum periodo critico nos ultimos dados.</small>}
         </div>
       </div>
@@ -101,8 +148,12 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
           </thead>
           <tbody>
             {visibleMonths.map((item) => (
-              <tr key={item.period}>
-                <td>{item.period}</td>
+              <tr
+                className={item.period === selectedMonth.period ? "is-selected" : ""}
+                key={item.period}
+                onClick={() => setSelectedPeriod(item.period)}
+              >
+                <td>{formatMonthLabel(item.period)}</td>
                 <td>{formatNumberCell(item.value)}</td>
                 <td>{formatSignedCell(item.variation)}</td>
                 <td>{formatPercentCell(item.variation_pct)}</td>

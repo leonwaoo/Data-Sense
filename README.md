@@ -200,3 +200,8 @@ Perguntas uteis para teste:
 Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, dashboard automatico personalizavel, filtros globais, historico local, auditoria de qualidade, chat analitico e sugestoes de graficos.
 
 Tambem ja possui exportacao de relatorio em PDF/PNG apos o carregamento do dataset.
+
+## Contribuindo e licenca
+
+- Convencao de commits e fluxo de trabalho: veja [CONTRIBUTING.md](CONTRIBUTING.md).
+- Distribuido sob a licenca [MIT](LICENSE).

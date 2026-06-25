@@ -57,6 +57,7 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = _pdf_kpi_cards(pdf, context, margin, y, width)
     y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Diagnostico de variacao", _managerial_variation_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Causa raiz gerencial", _managerial_root_cause_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Comparativo mes a mes", _managerial_monthly_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Insights gerenciais", _managerial_insight_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), margin, y, width, height)
@@ -87,6 +88,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
         for items in [
             _managerial_summary_items(context),
             _managerial_variation_items(context),
+            _managerial_root_cause_items(context),
             _managerial_monthly_items(context),
             _managerial_insight_items(context),
             _managerial_action_items(context),
@@ -117,6 +119,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     y += 150
     y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Diagnostico de variacao", _managerial_variation_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Causa raiz gerencial", _managerial_root_cause_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Comparativo mes a mes", _managerial_monthly_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Insights gerenciais", _managerial_insight_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Alertas e recomendacoes gerenciais", _managerial_action_items(context), fonts, x, y, max_width)
@@ -212,6 +215,46 @@ def _managerial_variation_items(context: ReportContext) -> list[str]:
             f"({_format_signed_number(trend.get('change'))}; {_format_pct(trend.get('change_pct'))})."
         )
     return items or ["Nao ha variacao temporal suficiente para diagnostico gerencial."]
+
+
+def _managerial_root_cause_items(context: ReportContext) -> list[str]:
+    analysis = context.managerial_analysis or {}
+    root_cause = analysis.get("root_cause_analysis") or {}
+    if not root_cause:
+        return ["Sem causa raiz suficiente para exportacao nesta base."]
+
+    items = [str(item) for item in (root_cause.get("summary") or [])[:3] if item]
+    movement = root_cause.get("movement") or {}
+    responsible = root_cause.get("responsible_month") or {}
+    primary_contributor = root_cause.get("primary_contributor") or {}
+    waterfall = root_cause.get("waterfall") or {}
+
+    if movement:
+        items.append(
+            f"Movimento principal: {root_cause.get('metric', 'metrica')} saiu de "
+            f"{_format_number(movement.get('previous_value'))} para {_format_number(movement.get('current_value'))}; "
+            f"variacao {_format_signed_number(movement.get('variation'))} ({_format_pct(movement.get('variation_pct'))})."
+        )
+    if primary_contributor:
+        items.append(
+            f"Principal contribuinte: {primary_contributor.get('name')} "
+            f"({_format_signed_number(primary_contributor.get('variation'))}; "
+            f"{_format_pct(primary_contributor.get('share_of_abs_change'))} da mudanca explicada pelos principais recortes)."
+        )
+    if responsible.get("historical_mean") is not None:
+        items.append(
+            f"Comparacao historica: media anterior {_format_number(responsible.get('historical_mean'))}; "
+            f"distancia {_format_signed_number(responsible.get('historical_delta'))}."
+        )
+    if waterfall.get("steps"):
+        labels = ", ".join(str(step.get("label")) for step in waterfall["steps"][:6] if step.get("label"))
+        items.append(f"Waterfall gerado com os principais passos: {labels}.")
+
+    confidence = root_cause.get("confidence")
+    recommendation = root_cause.get("recommendation")
+    if confidence or recommendation:
+        items.append(f"Confianca: {confidence or 'n/d'}. Recomendacao: {recommendation or 'validar evidencias principais'}.")
+    return items[:7] or ["Sem causa raiz suficiente para exportacao nesta base."]
 
 
 def _managerial_monthly_items(context: ReportContext) -> list[str]:

@@ -22,6 +22,7 @@ def build_powerbi_export(dataset: DatasetSession) -> bytes:
     with ZipFile(output, mode="w", compression=ZIP_DEFLATED) as package:
         package.writestr("dados_tratados.csv", _csv_bytes(dataset.dataframe))
         package.writestr("comparativo_mensal.csv", _csv_bytes(pd.DataFrame(_monthly_rows(analysis))))
+        package.writestr("causa_raiz.csv", _csv_bytes(pd.DataFrame(_root_cause_rows(analysis))))
         package.writestr("insights_gerenciais.csv", _csv_bytes(pd.DataFrame(_insight_rows(analysis))))
         package.writestr("graficos_sugeridos.csv", _csv_bytes(pd.DataFrame(_chart_rows(dashboard))))
         package.writestr("metadados.json", _json_bytes(_metadata(dataset, analysis, dashboard, quality)))
@@ -76,6 +77,67 @@ def _insight_rows(analysis: dict) -> list[dict]:
     return rows
 
 
+def _root_cause_rows(analysis: dict) -> list[dict]:
+    root_cause = analysis.get("root_cause_analysis") or {}
+    if not root_cause:
+        return []
+
+    rows = []
+    movement = root_cause.get("movement") or {}
+    responsible = root_cause.get("responsible_month") or {}
+    waterfall_steps = root_cause.get("waterfall", {}).get("steps") or []
+
+    for dimension in root_cause.get("dimension_drivers") or []:
+        dimension_name = dimension.get("dimension")
+        for contributor in dimension.get("contributors") or []:
+            rows.append(
+                {
+                    "tipo_linha": "contribuinte",
+                    "periodo": root_cause.get("period"),
+                    "periodo_anterior": root_cause.get("previous_period"),
+                    "metrica": root_cause.get("metric"),
+                    "direcao": movement.get("direction"),
+                    "dimensao": dimension_name,
+                    "entidade": contributor.get("name"),
+                    "valor_atual": contributor.get("current_value"),
+                    "valor_anterior": contributor.get("previous_value"),
+                    "variacao": contributor.get("variation"),
+                    "participacao_mudanca_abs": contributor.get("share_of_abs_change"),
+                    "participacao_mudanca_total": contributor.get("share_of_total_change"),
+                    "media_historica_periodo": responsible.get("historical_mean"),
+                    "distancia_media_historica": responsible.get("historical_delta"),
+                    "z_score": responsible.get("z_score"),
+                    "confianca": root_cause.get("confidence"),
+                    "recomendacao": root_cause.get("recommendation"),
+                }
+            )
+
+    for index, step in enumerate(waterfall_steps, start=1):
+        rows.append(
+            {
+                "tipo_linha": "waterfall",
+                "periodo": root_cause.get("period"),
+                "periodo_anterior": root_cause.get("previous_period"),
+                "metrica": root_cause.get("metric"),
+                "direcao": movement.get("direction"),
+                "dimensao": (root_cause.get("waterfall") or {}).get("dimension"),
+                "entidade": step.get("label"),
+                "valor_atual": step.get("value"),
+                "valor_anterior": None,
+                "variacao": step.get("delta"),
+                "participacao_mudanca_abs": None,
+                "participacao_mudanca_total": None,
+                "media_historica_periodo": responsible.get("historical_mean"),
+                "distancia_media_historica": responsible.get("historical_delta"),
+                "z_score": responsible.get("z_score"),
+                "confianca": root_cause.get("confidence"),
+                "recomendacao": f"Passo {index} do waterfall: {step.get('kind')}",
+            }
+        )
+
+    return rows
+
+
 def _chart_rows(dashboard: dict) -> list[dict]:
     rows = []
     for chart in dashboard.get("charts", []):
@@ -123,12 +185,15 @@ def _readme_text(dataset: DatasetSession, analysis: dict) -> str:
             "1. Extraia este ZIP em uma pasta.",
             "2. No Power BI Desktop, use Obter dados > Texto/CSV para importar dados_tratados.csv.",
             "3. Importe comparativo_mensal.csv para criar graficos de evolucao mes a mes.",
-            "4. Importe insights_gerenciais.csv para criar uma pagina de narrativa executiva.",
-            "5. Use graficos_sugeridos.csv como roteiro para montar visuais equivalentes.",
+            "4. Importe causa_raiz.csv para criar waterfall, ranking de contribuicao e leitura de quem puxou a mudanca.",
+            "5. Importe insights_gerenciais.csv para criar uma pagina de narrativa executiva.",
+            "6. Use graficos_sugeridos.csv como roteiro para montar visuais equivalentes.",
             "",
             "Graficos recomendados:",
             f"- Linha: periodo x {primary_metric}.",
             "- Colunas: periodo x variacao.",
+            "- Waterfall: causa_raiz.csv filtrado em tipo_linha = waterfall.",
+            "- Barras horizontais: causa_raiz.csv filtrado em tipo_linha = contribuinte, entidade x variacao.",
             "- Tabela: periodo, valor, variacao_pct, status, leitura_gerencial.",
             "- Cartoes: ultimo periodo, maior alta, maior queda, score de qualidade.",
             "",

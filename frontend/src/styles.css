@@ -532,6 +532,208 @@ h2 {
   font-size: clamp(1rem, 1.6vw, 1.22rem);
 }
 
+.root-cause-panel {
+  background: #ffffff;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 13px;
+  padding: 14px;
+}
+
+.root-cause-heading,
+.root-cause-heading > div,
+.root-cause-waterfall > div:first-child,
+.contributor-row,
+.root-cause-recommendation {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.root-cause-heading {
+  justify-content: space-between;
+}
+
+.root-cause-heading > div {
+  min-width: 0;
+}
+
+.root-cause-heading svg {
+  color: #2563eb;
+  flex: 0 0 auto;
+}
+
+.root-cause-heading strong,
+.root-cause-waterfall strong,
+.root-cause-list strong,
+.root-cause-recommendation strong {
+  color: #0f172a;
+}
+
+.root-cause-heading span,
+.root-cause-grid span,
+.root-cause-grid small,
+.root-cause-waterfall span,
+.root-cause-list span,
+.root-cause-list small,
+.root-cause-recommendation span,
+.root-cause-waterfall p {
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.confidence-pill {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.confidence-alta {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.confidence-media {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.confidence-baixa {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.root-cause-summary {
+  display: grid;
+  gap: 7px;
+}
+
+.root-cause-summary p {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 750;
+  margin: 0;
+  padding: 10px;
+}
+
+.root-cause-grid,
+.root-cause-detail-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.root-cause-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.root-cause-grid article,
+.root-cause-list,
+.root-cause-waterfall {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.root-cause-grid strong {
+  color: #0f172a;
+  font-size: clamp(1rem, 1.4vw, 1.22rem);
+  overflow-wrap: anywhere;
+}
+
+.root-cause-detail-grid {
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
+}
+
+.root-cause-list > div:first-child,
+.root-cause-waterfall > div:first-child {
+  justify-content: space-between;
+}
+
+.contributor-row {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) 110px 72px;
+  padding-top: 8px;
+}
+
+.contributor-row strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.contributor-row small {
+  text-align: right;
+}
+
+.waterfall-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.waterfall-step {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(96px, 0.8fr) minmax(120px, 1fr) 88px;
+}
+
+.waterfall-step > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waterfall-step strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.waterfall-bar-track {
+  background: #e2e8f0;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.waterfall-bar-track i {
+  background: #94a3b8;
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  width: var(--bar-width);
+}
+
+.waterfall-step.kind-increase .waterfall-bar-track i {
+  background: #2563eb;
+}
+
+.waterfall-step.kind-decrease .waterfall-bar-track i {
+  background: #d97706;
+}
+
+.waterfall-step.kind-current .waterfall-bar-track i,
+.waterfall-step.kind-baseline .waterfall-bar-track i {
+  background: #475569;
+}
+
+.root-cause-recommendation {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  justify-content: space-between;
+  padding: 11px 12px;
+}
+
 .managerial-monthly {
   background: #ffffff;
   border: 1px solid #dbe5ef;
@@ -1438,6 +1640,8 @@ th {
   .dashboard-chart-grid,
   .managerial-context-grid,
   .managerial-kpis,
+  .root-cause-grid,
+  .root-cause-detail-grid,
   .managerial-insight-grid,
   .managerial-bottom-grid,
   .suggested-charts {
@@ -1510,6 +1714,25 @@ th {
 
   .domain-pill {
     white-space: normal;
+  }
+
+  .root-cause-heading,
+  .root-cause-recommendation,
+  .root-cause-list > div:first-child,
+  .root-cause-waterfall > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .contributor-row,
+  .waterfall-step {
+    grid-template-columns: 1fr;
+  }
+
+  .contributor-row strong,
+  .contributor-row small,
+  .waterfall-step strong {
+    text-align: left;
   }
 
   .dashboard-insights {

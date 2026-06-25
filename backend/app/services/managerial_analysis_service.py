@@ -116,6 +116,7 @@ def build_managerial_analysis(dataset: DatasetSession) -> dict:
         "kpis": diagnostic["kpis"],
         "insights": diagnostic["insights"],
         "variations": diagnostic["variations"],
+        "root_cause_analysis": diagnostic["root_cause_analysis"],
         "monthly_comparisons": diagnostic["monthly_comparisons"],
         "driver_evidence": diagnostic["driver_evidence"],
         "alerts": diagnostic["alerts"],
@@ -189,6 +190,7 @@ def _build_variation_diagnostic(
     alerts = _alerts(abnormal_periods, focus, metric_map, period_metrics)
     recommendations = _recommendations(domain["type"], focus, primary_metric, driver_evidence, abnormal_periods)
     monthly_comparisons = _monthly_comparisons(period_metrics, metric_map, domain)
+    root_cause_analysis = _root_cause_analysis(prepared, period_metrics, metric_map, dimensions, domain, focus, driver_evidence)
 
     return {
         "summary": summary,
@@ -201,6 +203,7 @@ def _build_variation_diagnostic(
             "abnormal_periods": [_movement_payload(row) for _, row in abnormal_periods.head(5).iterrows()],
             "trend": _trend_payload(period_metrics),
         },
+        "root_cause_analysis": root_cause_analysis,
         "monthly_comparisons": monthly_comparisons,
         "driver_evidence": driver_evidence,
         "alerts": alerts,
@@ -214,6 +217,7 @@ def _build_variation_diagnostic(
                 "drop": _movement_payload(largest_drop),
             },
             "driver_evidence": driver_evidence,
+            "root_cause_analysis": root_cause_analysis,
             "monthly_comparisons": monthly_comparisons[-12:],
             "abnormal_periods": [_movement_payload(row) for _, row in abnormal_periods.head(8).iterrows()],
             "limitations": [],
@@ -235,6 +239,262 @@ def _period_metrics(prepared: pd.DataFrame, metric_map: dict) -> pd.DataFrame:
         .reset_index(drop=True)
     )
     return result
+
+
+def _root_cause_analysis(
+    prepared: pd.DataFrame,
+    period_metrics: pd.DataFrame,
+    metric_map: dict,
+    dimensions: list[dict],
+    domain: dict,
+    focus: pd.Series,
+    driver_evidence: list[dict],
+) -> dict:
+    primary_metric = metric_map["primary_metric"]
+    focus_period = str(focus["periodo"])
+    previous_period = _previous_period(period_metrics, focus_period)
+    current_value = _safe_float(focus.get("valor"))
+    variation = _safe_float(focus.get("variacao"))
+    previous_value = None if current_value is None or variation is None else current_value - variation
+    variation_pct = _safe_float(focus.get("variacao_pct"))
+    direction = "alta" if (variation or 0) >= 0 else "queda"
+
+    dimension_drivers = _root_dimension_drivers(prepared, dimensions, focus_period, previous_period, variation)
+    primary_dimension = next((item for item in dimension_drivers if item.get("contributors")), None)
+    top_contributor = primary_dimension["contributors"][0] if primary_dimension else None
+    waterfall = _waterfall_payload(previous_value, current_value, focus_period, previous_period, top_contributor, primary_dimension)
+    historical_mean = _safe_float(focus.get("media_historica"))
+    historical_delta = None if current_value is None or historical_mean is None else current_value - historical_mean
+    historical_pct = historical_delta / abs(historical_mean) if historical_delta is not None and historical_mean else None
+
+    summary = _root_cause_summary(
+        primary_metric,
+        focus_period,
+        previous_period,
+        direction,
+        variation,
+        variation_pct,
+        top_contributor,
+        historical_mean,
+        historical_delta,
+        driver_evidence,
+    )
+
+    return {
+        "title": f"Causa raiz provavel da {direction} em {focus_period}",
+        "metric": primary_metric,
+        "period": focus_period,
+        "previous_period": previous_period,
+        "movement": {
+            "current_value": _round_or_none(current_value),
+            "previous_value": _round_or_none(previous_value),
+            "variation": _round_or_none(variation),
+            "variation_pct": _round_or_none(variation_pct),
+            "direction": direction,
+        },
+        "responsible_month": {
+            "period": focus_period,
+            "label": f"{focus_period} concentrou a maior {direction} detectada na serie.",
+            "historical_mean": _round_or_none(historical_mean),
+            "historical_delta": _round_or_none(historical_delta),
+            "historical_delta_pct": _round_or_none(historical_pct),
+            "z_score": _round_or_none(focus.get("z_score")),
+        },
+        "primary_contributor": top_contributor,
+        "dimension_drivers": dimension_drivers,
+        "supporting_metrics": driver_evidence[:4],
+        "waterfall": waterfall,
+        "summary": summary,
+        "confidence": _root_cause_confidence(top_contributor, driver_evidence, primary_dimension),
+        "recommendation": _root_cause_recommendation(domain["type"], direction, top_contributor),
+    }
+
+
+def _root_dimension_drivers(
+    prepared: pd.DataFrame,
+    dimensions: list[dict],
+    focus_period: str,
+    previous_period: str | None,
+    total_variation: float | None,
+) -> list[dict]:
+    drivers = []
+    if not previous_period:
+        return drivers
+
+    for dimension in dimensions[:4]:
+        column = dimension["column"]
+        if column not in prepared.columns:
+            continue
+
+        current = prepared[prepared["_periodo"] == focus_period].groupby(column)["_valor_principal"].sum()
+        previous = prepared[prepared["_periodo"] == previous_period].groupby(column)["_valor_principal"].sum()
+        index = current.index.union(previous.index)
+        comparison = pd.DataFrame(
+            {
+                "name": index.astype(str),
+                "current_value": current.reindex(index).fillna(0).to_numpy(),
+                "previous_value": previous.reindex(index).fillna(0).to_numpy(),
+            }
+        )
+        if comparison.empty:
+            continue
+
+        comparison["variation"] = comparison["current_value"] - comparison["previous_value"]
+        abs_total = comparison["variation"].abs().sum()
+        comparison["share_of_abs_change"] = comparison["variation"].abs() / abs_total if abs_total else 0
+        comparison["share_of_total_change"] = comparison["variation"] / total_variation if total_variation else None
+        comparison = comparison.sort_values("variation", key=lambda values: values.abs(), ascending=False)
+        contributors = [
+            {
+                "name": str(row["name"]),
+                "current_value": _round_or_none(row["current_value"]),
+                "previous_value": _round_or_none(row["previous_value"]),
+                "variation": _round_or_none(row["variation"]),
+                "share_of_abs_change": _round_or_none(row["share_of_abs_change"]),
+                "share_of_total_change": _round_or_none(row["share_of_total_change"]),
+            }
+            for _, row in comparison.head(8).iterrows()
+        ]
+        drivers.append(
+            {
+                "dimension": column,
+                "label": dimension.get("label", column),
+                "contributors": contributors,
+                "coverage": _round_or_none(sum(item["share_of_abs_change"] or 0 for item in contributors[:5])),
+            }
+        )
+
+    return drivers
+
+
+def _waterfall_payload(
+    previous_value: float | None,
+    current_value: float | None,
+    focus_period: str,
+    previous_period: str | None,
+    top_contributor: dict | None,
+    primary_dimension: dict | None,
+) -> dict:
+    if previous_value is None or current_value is None:
+        return {"steps": []}
+
+    steps = [
+        {
+            "label": previous_period or "Periodo anterior",
+            "kind": "baseline",
+            "value": _round_or_none(previous_value),
+            "delta": None,
+            "running_total": _round_or_none(previous_value),
+        }
+    ]
+    running_total = previous_value
+    contributors = (primary_dimension or {}).get("contributors", [])[:5]
+    for contributor in contributors:
+        delta = _safe_float(contributor.get("variation")) or 0
+        running_total += delta
+        steps.append(
+            {
+                "label": str(contributor.get("name")),
+                "kind": "increase" if delta >= 0 else "decrease",
+                "value": _round_or_none(running_total),
+                "delta": _round_or_none(delta),
+                "running_total": _round_or_none(running_total),
+            }
+        )
+
+    residual = current_value - running_total
+    if abs(residual) >= max(abs(current_value) * 0.01, 0.01):
+        running_total += residual
+        steps.append(
+            {
+                "label": "Outros efeitos",
+                "kind": "increase" if residual >= 0 else "decrease",
+                "value": _round_or_none(running_total),
+                "delta": _round_or_none(residual),
+                "running_total": _round_or_none(running_total),
+            }
+        )
+
+    steps.append(
+        {
+            "label": focus_period,
+            "kind": "current",
+            "value": _round_or_none(current_value),
+            "delta": None,
+            "running_total": _round_or_none(current_value),
+        }
+    )
+    return {
+        "dimension": (primary_dimension or {}).get("dimension"),
+        "top_contributor": top_contributor,
+        "steps": steps,
+    }
+
+
+def _root_cause_summary(
+    primary_metric: str,
+    focus_period: str,
+    previous_period: str | None,
+    direction: str,
+    variation: float | None,
+    variation_pct: float | None,
+    top_contributor: dict | None,
+    historical_mean: float | None,
+    historical_delta: float | None,
+    driver_evidence: list[dict],
+) -> list[str]:
+    summary = [
+        (
+            f"{primary_metric} teve {direction} em {focus_period} contra {previous_period or 'periodo anterior'}, "
+            f"movendo {_format_signed_number(variation)} ({_format_pct(variation_pct)})."
+        )
+    ]
+    if top_contributor:
+        summary.append(
+            f"Quem mais puxou a mudanca foi {top_contributor['name']}, com contribuicao de "
+            f"{_format_signed_number(top_contributor.get('variation'))}."
+        )
+    if historical_mean is not None:
+        summary.append(
+            f"Contra a media historica anterior ({_format_number(historical_mean)}), o periodo ficou "
+            f"{_format_signed_number(historical_delta)} distante."
+        )
+    if driver_evidence:
+        summary.append(driver_evidence[0]["interpretation"])
+    return summary
+
+
+def _root_cause_confidence(top_contributor: dict | None, driver_evidence: list[dict], primary_dimension: dict | None) -> str:
+    score = 0
+    if top_contributor:
+        score += 1
+    if driver_evidence:
+        score += 1
+    if (primary_dimension or {}).get("coverage", 0) >= 0.75:
+        score += 1
+    return "alta" if score >= 3 else "media" if score >= 1 else "baixa"
+
+
+def _root_cause_recommendation(domain_type: str, direction: str, top_contributor: dict | None) -> str:
+    contributor = f" para {top_contributor['name']}" if top_contributor else ""
+    if domain_type == "estoque_operacao":
+        if direction == "queda":
+            return f"Auditar saidas, transferencias, consumo e reposicao{contributor} no periodo destacado."
+        return f"Auditar entradas, producao, compras e risco de estoque parado{contributor}."
+    if domain_type == "vendas":
+        return f"Validar cliente, produto, canal e campanhas que concentraram a variacao{contributor}."
+    if domain_type == "compras":
+        return f"Validar fornecedor, pedido, prazo e itens que concentraram a variacao{contributor}."
+    return f"Revisar os registros que concentraram a variacao{contributor} antes de fechar a conclusao."
+
+
+def _previous_period(period_metrics: pd.DataFrame, focus_period: str) -> str | None:
+    periods = period_metrics["periodo"].astype(str).tolist()
+    try:
+        index = periods.index(str(focus_period))
+    except ValueError:
+        return None
+    return periods[index - 1] if index > 0 else None
 
 
 def _monthly_comparisons(period_metrics: pd.DataFrame, metric_map: dict, domain: dict) -> list[dict]:
@@ -634,6 +894,7 @@ def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) ->
             }
         ],
         "variations": {},
+        "root_cause_analysis": None,
         "monthly_comparisons": [],
         "driver_evidence": [],
         "alerts": limitations,
@@ -664,6 +925,7 @@ def _empty_diagnostic(metric_map: dict, domain: dict, reason: str) -> dict:
         "kpis": [],
         "insights": [insight],
         "variations": {},
+        "root_cause_analysis": None,
         "monthly_comparisons": [],
         "driver_evidence": [],
         "alerts": [reason],

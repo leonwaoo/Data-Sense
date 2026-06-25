@@ -28,6 +28,7 @@ O arquivo `.zip` gerado contem:
 
 - `dados_tratados.csv`: base tabular pronta para importar no Power BI.
 - `comparativo_mensal.csv`: metricas por periodo, com variacao absoluta, variacao percentual, media movel, acumulado do ano, comparacao com o ano anterior e comparacao dos ultimos 3 meses.
+- `causa_raiz.csv`: contribuintes da mudanca, participacao na variacao e passos do waterfall para explicar quem puxou alta ou queda.
 - `insights_gerenciais.csv`: principais insights, alertas e recomendacoes calculados pelo DataSense.
 - `graficos_sugeridos.csv`: lista de visuais recomendados, com tipo de grafico, eixo, metrica e objetivo.
 - `metadados.json`: mapeamento de colunas, dominio detectado, metricas principais e contexto da analise.
@@ -37,14 +38,16 @@ O arquivo `.zip` gerado contem:
 
 1. Importar `dados_tratados.csv` como tabela principal.
 2. Importar `comparativo_mensal.csv` para criar paginas de evolucao temporal.
-3. Usar `insights_gerenciais.csv` para montar uma pagina executiva com alertas e recomendacoes.
-4. Consultar `graficos_sugeridos.csv` para escolher os visuais iniciais.
-5. Usar `metadados.json` como referencia para entender quais colunas foram usadas como metrica, tempo e dimensao.
+3. Importar `causa_raiz.csv` para montar waterfall e ranking de contribuicao.
+4. Usar `insights_gerenciais.csv` para montar uma pagina executiva com alertas e recomendacoes.
+5. Consultar `graficos_sugeridos.csv` para escolher os visuais iniciais.
+6. Usar `metadados.json` como referencia para entender quais colunas foram usadas como metrica, tempo e dimensao.
 
 ## Paginas sugeridas
 
 - **Resumo executivo**: KPIs principais, qualidade geral, principais alertas e recomendacoes.
 - **Comparativo mensal**: mes contra mes, acumulado do ano, media movel e variacao percentual.
+- **Causa raiz**: waterfall da variacao, principal produto/cliente/fornecedor/categoria que puxou a mudanca e distancia contra media historica.
 - **Ranking gerencial**: produto, cliente, fornecedor, categoria ou outra dimensao relevante.
 - **Qualidade dos dados**: nulos, duplicatas, outliers e pontos que exigem revisao.
 
@@ -69,4 +72,3 @@ Os nomes das colunas devem ser ajustados de acordo com a base carregada.
 ## Status
 
 Implementado na entrega `Adiciona comparativos mensais e pacote Power BI`.
-

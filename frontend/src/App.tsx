@@ -188,6 +188,63 @@ type ManagerialMonthlyComparison = {
   drivers: ManagerialDriver[];
 };
 
+type RootCauseContributor = {
+  name: string;
+  current_value: number | null;
+  previous_value: number | null;
+  variation: number | null;
+  share_of_abs_change: number | null;
+  share_of_total_change: number | null;
+};
+
+type RootCauseDimensionDriver = {
+  dimension: string;
+  label: string;
+  contributors: RootCauseContributor[];
+  coverage: number | null;
+};
+
+type RootCauseWaterfallStep = {
+  label: string;
+  kind: "baseline" | "increase" | "decrease" | "current" | string;
+  value: number | null;
+  delta: number | null;
+  running_total: number | null;
+};
+
+type RootCauseAnalysis = {
+  title: string;
+  metric: string;
+  period: string;
+  previous_period: string | null;
+  movement: {
+    current_value: number | null;
+    previous_value: number | null;
+    variation: number | null;
+    variation_pct: number | null;
+    direction: string;
+  };
+  responsible_month: {
+    period: string;
+    label: string;
+    historical_mean: number | null;
+    historical_delta: number | null;
+    historical_delta_pct: number | null;
+    z_score: number | null;
+  };
+  primary_contributor: RootCauseContributor | null;
+  dimension_drivers: RootCauseDimensionDriver[];
+  supporting_metrics: ManagerialDriver[];
+  waterfall: {
+    dimension?: string | null;
+    top_contributor?: RootCauseContributor | null;
+    steps: RootCauseWaterfallStep[];
+  };
+  summary: string[];
+  confidence: "alta" | "media" | "baixa" | string;
+  recommendation: string;
+};
+
 type ManagerialAnalysis = {
   mode: string;
   title: string;
@@ -214,6 +271,7 @@ type ManagerialAnalysis = {
   };
   kpis: { label: string; value: string; detail: string }[];
   insights: ManagerialInsight[];
+  root_cause_analysis?: RootCauseAnalysis | null;
   monthly_comparisons?: ManagerialMonthlyComparison[];
   alerts: string[];
   recommendations: string[];
@@ -935,6 +993,7 @@ function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis 
   const primaryMetric = analysis.context.metric_map.primary_metric ?? "Metrica nao detectada";
   const supportMetrics = Object.values(analysis.context.metric_map.support_metrics);
   const monthlyComparisons = analysis.monthly_comparisons ?? [];
+  const rootCause = analysis.root_cause_analysis ?? null;
 
   return (
     <section className="panel managerial-panel">
@@ -986,6 +1045,8 @@ function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis 
           ))}
         </div>
       ) : null}
+
+      <RootCauseSection rootCause={rootCause} />
 
       {monthlyComparisons.length ? (
         <div className="managerial-monthly">
@@ -1067,6 +1128,118 @@ function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis 
         </div>
       </div>
     </section>
+  );
+}
+
+function RootCauseSection({ rootCause }: { rootCause: RootCauseAnalysis | null }) {
+  if (!rootCause) return null;
+
+  const primaryDimension = rootCause.dimension_drivers.find((item) => item.contributors.length > 0);
+  const contributors = primaryDimension?.contributors ?? [];
+  const movement = rootCause.movement;
+  const responsible = rootCause.responsible_month;
+
+  return (
+    <div className="root-cause-panel">
+      <div className="root-cause-heading">
+        <div>
+          <BarChart3 size={18} />
+          <div>
+            <strong>{rootCause.title}</strong>
+            <span>
+              {rootCause.metric} - {rootCause.previous_period ?? "periodo anterior"} para {rootCause.period}
+            </span>
+          </div>
+        </div>
+        <span className={`confidence-pill confidence-${rootCause.confidence}`}>Confianca {rootCause.confidence}</span>
+      </div>
+
+      <div className="root-cause-summary">
+        {rootCause.summary.slice(0, 4).map((item) => (
+          <p key={item}>{item}</p>
+        ))}
+      </div>
+
+      <div className="root-cause-grid">
+        <article>
+          <span>O que mudou</span>
+          <strong>{formatSignedCell(movement.variation)}</strong>
+          <small>{formatPercentCell(movement.variation_pct)} contra o periodo anterior</small>
+        </article>
+        <article>
+          <span>Mes responsavel</span>
+          <strong>{responsible.period}</strong>
+          <small>{formatSignedCell(responsible.historical_delta)} contra a media historica</small>
+        </article>
+        <article>
+          <span>Quem puxou</span>
+          <strong>{rootCause.primary_contributor?.name ?? "Nao identificado"}</strong>
+          <small>{formatSignedCell(rootCause.primary_contributor?.variation)} de contribuicao</small>
+        </article>
+      </div>
+
+      <div className="root-cause-detail-grid">
+        <div className="root-cause-list">
+          <div>
+            <strong>{primaryDimension?.label ?? "Contribuintes"}</strong>
+            <span>{contributors.length ? "Maiores impactos na variacao" : "Sem recorte suficiente"}</span>
+          </div>
+          {contributors.slice(0, 5).map((contributor) => (
+            <div className="contributor-row" key={`${primaryDimension?.dimension}-${contributor.name}`}>
+              <span>{contributor.name}</span>
+              <strong>{formatSignedCell(contributor.variation)}</strong>
+              <small>{formatPercentCell(contributor.share_of_abs_change)}</small>
+            </div>
+          ))}
+        </div>
+
+        <WaterfallMiniChart steps={rootCause.waterfall.steps} />
+      </div>
+
+      <footer className="root-cause-recommendation">
+        <strong>Acao recomendada</strong>
+        <span>{rootCause.recommendation}</span>
+      </footer>
+    </div>
+  );
+}
+
+function WaterfallMiniChart({ steps }: { steps: RootCauseWaterfallStep[] }) {
+  if (!steps.length) {
+    return (
+      <div className="root-cause-waterfall">
+        <strong>Waterfall</strong>
+        <p>Sem passos suficientes para montar a ponte de variacao.</p>
+      </div>
+    );
+  }
+
+  const magnitudes = steps.map((step) => Math.abs(step.delta ?? step.value ?? 0));
+  const maxMagnitude = Math.max(...magnitudes, 1);
+
+  return (
+    <div className="root-cause-waterfall">
+      <div>
+        <strong>Waterfall da variacao</strong>
+        <span>Inicio, contribuicoes e fim</span>
+      </div>
+      <div className="waterfall-steps">
+        {steps.slice(0, 7).map((step) => {
+          const displayValue = step.delta ?? step.value;
+          const width = Math.max(8, Math.min(100, (Math.abs(displayValue ?? 0) / maxMagnitude) * 100));
+          const style = { "--bar-width": `${width}%` } as CSSProperties;
+          return (
+            <div className={`waterfall-step kind-${step.kind}`} key={`${step.kind}-${step.label}`}>
+              <span>{step.label}</span>
+              <div className="waterfall-bar-track">
+                <i style={style} />
+              </div>
+              <strong>{step.delta === null || step.delta === undefined ? formatNumberCell(step.value) : formatSignedCell(step.delta)}</strong>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -16,6 +16,7 @@ from app.services.column_heuristics import normalize_text as _normalize_text
 
 MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024
 SUPPORTED_EXTENSIONS = {".csv", ".tsv", ".txt", ".xlsx", ".xls", ".json"}
+MIN_HEADER_CONFIDENCE = 0.2
 # Limite de datasets mantidos em memoria. Sem teto, uploads sucessivos fariam o
 # processo crescer indefinidamente no servidor. Usamos politica LRU: o dataset
 # acessado ha mais tempo e descartado primeiro.
@@ -34,6 +35,7 @@ def load_dataset(content: bytes, file_name: str) -> DatasetSession:
         raise ValueError("Formato nao suportado. Envie CSV, TSV, TXT, XLSX, XLS ou JSON.")
 
     raw_dataframe, ingest_report = _read_dataset(content=content, extension=extension)
+    _validate_ingest_report(ingest_report)
     dataframe = _prepare_dataframe(raw_dataframe)
     if dataframe.empty or not list(dataframe.columns):
         raise ValueError("O arquivo precisa conter colunas e pelo menos uma linha.")
@@ -62,6 +64,16 @@ def get_dataset(dataset_id: str) -> DatasetSession:
         raise HTTPException(status_code=404, detail="Dataset nao encontrado.")
     _DATASETS.move_to_end(dataset_id)
     return dataset
+
+
+def _validate_ingest_report(report: dict) -> None:
+    source_type = report.get("source_type")
+    header_confidence = float(report.get("header_confidence") or 0)
+    if source_type in {"delimited", "excel"} and header_confidence < MIN_HEADER_CONFIDENCE:
+        raise ValueError(
+            "Nao foi possivel identificar um cabecalho confiavel. "
+            "Inclua uma linha com nomes de colunas antes dos dados."
+        )
 
 
 def _read_dataset(content: bytes, extension: str) -> tuple[pd.DataFrame, dict]:

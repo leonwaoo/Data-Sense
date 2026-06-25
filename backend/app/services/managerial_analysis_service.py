@@ -129,7 +129,7 @@ def _build_variation_diagnostic(
     root_cause_analysis = _root_cause_analysis(prepared, period_metrics, metric_map, dimensions, domain, focus, driver_evidence)
     alerts = _deduplicate(
         [
-            *_alerts(abnormal_periods, focus, metric_map, period_metrics),
+            *_alerts(abnormal_periods, focus, metric_map, period_metrics, root_cause_analysis),
             *root_cause_analysis.get("concentration_alerts", []),
         ]
     )
@@ -1008,16 +1008,67 @@ def _kpis(period_metrics: pd.DataFrame, primary_metric: str, latest: pd.Series, 
     ]
 
 
-def _alerts(abnormal_periods: pd.DataFrame, focus: pd.Series, metric_map: dict, period_metrics: pd.DataFrame) -> list[str]:
+def _alerts(
+    abnormal_periods: pd.DataFrame,
+    focus: pd.Series,
+    metric_map: dict,
+    period_metrics: pd.DataFrame,
+    root_cause_analysis: dict | None = None,
+) -> list[str]:
     alerts = []
+    period_label = str(focus.get("periodo") or "periodo analisado")
+    variation_pct = _safe_float(focus.get("variacao_pct")) or 0
     if not abnormal_periods.empty:
         alerts.append(f"{abnormal_periods.shape[0]} periodo(s) tiveram variacao acima do padrao historico.")
-    if abs(_safe_float(focus.get("variacao_pct")) or 0) >= 0.5:
-        alerts.append(f"Movimento critico em {focus['periodo']}: {_format_pct(_safe_float(focus.get('variacao_pct')))}.")
+    if abs(variation_pct) >= 0.5:
+        alerts.append(f"Movimento critico em {period_label}: {_format_pct(variation_pct)}.")
+        if variation_pct <= -0.5:
+            alerts.append(f"Queda superior a 50% em {period_label}; priorizar validacao operacional imediata.")
+        elif variation_pct >= 0.5:
+            alerts.append(f"Alta superior a 50% em {period_label}; validar risco de excesso, pico artificial ou mudanca pontual.")
     for support_name in metric_map["support_metrics"]:
         if support_name in period_metrics.columns and period_metrics[support_name].isna().mean() > 0.2:
             alerts.append(f"A metrica de apoio {support_name} possui lacunas e reduz a confianca da explicacao.")
+    alerts.extend(_support_metric_alerts(period_metrics, metric_map, focus))
+    alerts.extend(_dimension_alerts(root_cause_analysis or {}))
     return alerts or ["Nenhum alerta critico adicional na leitura gerencial inicial."]
+
+
+def _support_metric_alerts(period_metrics: pd.DataFrame, metric_map: dict, focus: pd.Series) -> list[str]:
+    alerts = []
+    focus_index = int(focus.name) if isinstance(focus.name, int) else period_metrics.index[period_metrics["periodo"] == focus["periodo"]][0]
+    previous_row = period_metrics.iloc[focus_index - 1] if focus_index > 0 else None
+    if previous_row is None:
+        return alerts
+
+    cost_group = next((group for group in metric_map["support_metrics"] if "custo" in group), None)
+    volume_group = next((group for group in metric_map["support_metrics"] if "volume" in group), None)
+    if cost_group and volume_group and cost_group in period_metrics.columns and volume_group in period_metrics.columns:
+        current_cost = _safe_float(focus.get(cost_group))
+        previous_cost = _safe_float(previous_row.get(cost_group))
+        current_volume = _safe_float(focus.get(volume_group))
+        previous_volume = _safe_float(previous_row.get(volume_group))
+        if None not in {current_cost, previous_cost, current_volume, previous_volume}:
+            cost_delta = current_cost - previous_cost
+            volume_delta = current_volume - previous_volume
+            if cost_delta > 0 and volume_delta < 0:
+                alerts.append(
+                    f"Custo subiu enquanto volume caiu em {focus['periodo']}; revisar eficiencia, mix ou pressao de custo."
+                )
+    return alerts
+
+
+def _dimension_alerts(root_cause_analysis: dict) -> list[str]:
+    alerts = []
+    ranking = root_cause_analysis.get("dimension_impact_ranking") or []
+    if ranking:
+        top = ranking[0]
+        share_abs = _safe_float(top.get("share_of_abs_change")) or 0
+        if share_abs >= 0.8:
+            alerts.append(
+                f"{top.get('name')} concentra mais de 80% da variacao em {top.get('label')}; validar dependencia excessiva."
+            )
+    return alerts
 
 
 def _recommendations(domain_type: str, focus: pd.Series, primary_metric: str, driver_evidence: list[dict], abnormal_periods: pd.DataFrame) -> list[str]:

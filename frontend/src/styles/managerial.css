@@ -676,6 +676,29 @@
   line-height: 1.5;
 }
 
+.managerial-alert-list article {
+  background: var(--warning-soft);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.managerial-alert-list article span {
+  color: var(--warning);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.managerial-alert-list article p {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 /* Root cause */
 .root-cause-panel {
   background: var(--surface-2);

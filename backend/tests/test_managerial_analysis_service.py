@@ -65,6 +65,22 @@ def _year_over_year_inventory_dataset() -> DatasetSession:
     return DatasetSession(dataset_id="teste-yoy", file_name="estoque_yoy.xlsx", dataframe=pd.DataFrame(rows))
 
 
+def _cost_up_volume_down_dataset() -> DatasetSession:
+    dataframe = pd.DataFrame(
+        {
+            "Ano": [2025, 2025, 2025],
+            "Month": ["JAN", "FEV", "MAR"],
+            "Produto": ["Cafe Arabica", "Cafe Arabica", "Cafe Arabica"],
+            "FY GAAP": ["FY25", "FY25", "FY25"],
+            "Estoque Total (TON)": [1000, 980, 400],
+            "Estoque Fabrica (TON)": [700, 690, 280],
+            "Volume Industrializado (TON)": [200, 180, 120],
+            "Custo (R$/TON)": [450, 460, 490],
+        }
+    )
+    return DatasetSession(dataset_id="teste-custo-volume", file_name="estoque_alerta.xlsx", dataframe=dataframe)
+
+
 def test_detect_analysis_domain_recognizes_inventory_operations() -> None:
     dataset = _inventory_dataset()
     profile = build_profile(dataset)
@@ -116,6 +132,7 @@ def test_managerial_analysis_ranks_dimension_contributors_and_concentration_aler
     assert ranking[0]["share_of_abs_change"] >= 0.9
     assert any("Cafe A" in alert for alert in alerts)
     assert any("Cafe A" in alert for alert in analysis["alerts"])
+    assert any("mais de 80%" in alert for alert in analysis["alerts"])
 
 
 def test_managerial_analysis_builds_complete_comparative_summary() -> None:
@@ -127,3 +144,12 @@ def test_managerial_analysis_builds_complete_comparative_summary() -> None:
     assert {"Ultimos 3 meses", "Acumulado do ano", "Media movel 3M", "Melhor mes", "Pior mes"}.issubset(labels)
     assert any("ultimos 3 meses" in reading.lower() for reading in comparative["readings"])
     assert any("2025" in reading for reading in comparative["readings"])
+
+
+def test_managerial_analysis_emits_critical_drop_and_cost_vs_volume_alerts() -> None:
+    analysis = build_managerial_analysis(_cost_up_volume_down_dataset())
+
+    alerts = analysis["alerts"]
+
+    assert any("Queda superior a 50%" in alert for alert in alerts)
+    assert any("Custo subiu enquanto volume caiu" in alert for alert in alerts)

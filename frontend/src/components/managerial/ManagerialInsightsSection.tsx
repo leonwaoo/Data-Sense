@@ -169,10 +169,13 @@ export function ManagerialInsightsSection({
       </div>
 
       <div className="managerial-bottom-grid">
-        <div className="managerial-list">
+        <div className="managerial-list managerial-alert-list">
           <strong>Alertas</strong>
           {analysis.alerts.slice(0, 3).map((alert) => (
-            <p key={alert}>{alert}</p>
+            <article key={alert}>
+              <span>Alerta automatico</span>
+              <p>{alert}</p>
+            </article>
           ))}
         </div>
         <div className="managerial-list">

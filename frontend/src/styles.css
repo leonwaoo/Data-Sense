@@ -532,6 +532,135 @@ h2 {
   font-size: clamp(1rem, 1.6vw, 1.22rem);
 }
 
+.monthly-focus-panel {
+  gap: 16px;
+}
+
+.monthly-focus-heading,
+.monthly-focus-heading > div,
+.monthly-chart-card > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.monthly-focus-heading {
+  justify-content: space-between;
+}
+
+.monthly-focus-heading > div {
+  min-width: 0;
+}
+
+.monthly-focus-heading svg {
+  color: #0f766e;
+  flex: 0 0 auto;
+}
+
+.monthly-focus-heading h2 {
+  margin-bottom: 4px;
+}
+
+.monthly-focus-heading span,
+.monthly-focus-kpis span,
+.monthly-focus-kpis small,
+.monthly-chart-card span,
+.monthly-reading-card p,
+.monthly-reading-card span,
+.monthly-reading-card small {
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.monthly-focus-kpis {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.monthly-focus-kpis article,
+.monthly-chart-card,
+.monthly-reading-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.monthly-focus-kpis strong {
+  color: #0f172a;
+  font-size: clamp(1.05rem, 1.7vw, 1.32rem);
+  overflow-wrap: anywhere;
+}
+
+.monthly-focus-body {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.55fr);
+}
+
+.monthly-chart-card {
+  background: #ffffff;
+}
+
+.monthly-chart-card > div:first-child {
+  justify-content: space-between;
+}
+
+.monthly-chart-card strong,
+.monthly-reading-card strong {
+  color: #0f172a;
+}
+
+.monthly-reading-card {
+  align-content: start;
+  background: #ffffff;
+}
+
+.monthly-reading-card p {
+  color: #334155;
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.monthly-reading-card span {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  padding: 9px;
+}
+
+.monthly-simple-table {
+  overflow-x: auto;
+}
+
+.monthly-simple-table table {
+  border-collapse: collapse;
+  min-width: 920px;
+  width: 100%;
+}
+
+.monthly-simple-table th,
+.monthly-simple-table td {
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 0.84rem;
+  padding: 9px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.monthly-simple-table th {
+  color: #64748b;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
 .root-cause-panel {
   background: #ffffff;
   border: 1px solid #dbe5ef;
@@ -1640,6 +1769,8 @@ th {
   .dashboard-chart-grid,
   .managerial-context-grid,
   .managerial-kpis,
+  .monthly-focus-kpis,
+  .monthly-focus-body,
   .root-cause-grid,
   .root-cause-detail-grid,
   .managerial-insight-grid,
@@ -1683,6 +1814,8 @@ th {
   .panel-heading,
   .dashboard-heading,
   .managerial-heading,
+  .monthly-focus-heading,
+  .monthly-chart-card > div:first-child,
   .chart-card-heading,
   .toolbox-title,
   .insight-strip,

@@ -13,7 +13,6 @@ import {
   Filter,
   ImagePlus,
   LayoutDashboard,
-  Lightbulb,
   Palette,
   Printer,
   RotateCcw,
@@ -108,29 +107,6 @@ type Quality = {
   numeric_outliers?: Record<string, number>;
   numeric_outlier_details?: NumericOutlierDetail[];
   recommendations: string[];
-};
-
-type QualityAuditFinding = {
-  id: string;
-  severity: "critical" | "warning" | "info";
-  category: string;
-  title: string;
-  detail: string;
-  recommendation: string;
-  evidence: string[];
-};
-
-type QualityAudit = {
-  mode: "rules" | "ai";
-  ai_enabled: boolean;
-  ai_status: "not_configured" | "disabled" | "failed" | "completed";
-  ai_error?: string;
-  model: string | null;
-  analysis_score: number;
-  summary: string;
-  findings: QualityAuditFinding[];
-  recommendations: string[];
-  checks: Record<string, unknown>;
 };
 
 type ChartPayload = {
@@ -288,14 +264,6 @@ type UploadResponse = {
   supported_formats?: string[];
 };
 
-type ChartSuggestion = {
-  title: string;
-  type: string;
-  x: string;
-  y: string;
-  reason: string;
-};
-
 type DashboardKpi = {
   label: string;
   value: string;
@@ -443,11 +411,8 @@ export function App() {
   const [history, setHistory] = useState<HistoryItem[]>(loadHistory);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
-  const [chartSuggestions, setChartSuggestions] = useState<ChartSuggestion[]>([]);
-  const [qualityAudit, setQualityAudit] = useState<QualityAudit | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
-  const [isQualityAuditLoading, setIsQualityAuditLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<"pdf" | "png" | "powerbi" | null>(null);
@@ -459,14 +424,6 @@ export function App() {
     if (sample) void handleSampleUpload(sample);
   }, []);
 
-  const missingChartData = useMemo(() => {
-    if (!dataset) return [];
-    return Object.entries(dataset.profile.missing_values)
-      .map(([coluna, valores_ausentes]) => ({ coluna, valores_ausentes }))
-      .sort((a, b) => b.valores_ausentes - a.valores_ausentes)
-      .slice(0, 6);
-  }, [dataset]);
-
   async function handleUpload(file: File | null) {
     if (!file) return;
 
@@ -474,8 +431,6 @@ export function App() {
     setError(null);
     setAnswer(null);
     setDashboard(null);
-    setChartSuggestions([]);
-    setQualityAudit(null);
     setDashboardFilters(defaultDashboardFilters);
 
     const formData = new FormData();
@@ -499,15 +454,8 @@ export function App() {
         title: `Dashboard - ${uploadPayload.file_name.replace(/\.[^.]+$/, "")}`,
       }));
       setIsDashboardLoading(true);
-      setIsQualityAuditLoading(true);
-      const [suggestions, dashboardPayload, auditPayload] = await Promise.all([
-        fetchChartSuggestions(uploadPayload.dataset_id).catch(() => []),
-        fetchDashboard(uploadPayload.dataset_id).catch(() => null),
-        fetchQualityAudit(uploadPayload.dataset_id).catch(() => null),
-      ]);
-      setChartSuggestions(suggestions);
+      const dashboardPayload = await fetchDashboard(uploadPayload.dataset_id).catch(() => null);
       setDashboard(dashboardPayload);
-      setQualityAudit(auditPayload);
       if (dashboardPayload) {
         setHistory(saveHistory(uploadPayload, dashboardPayload));
       }
@@ -516,7 +464,6 @@ export function App() {
     } finally {
       setIsUploading(false);
       setIsDashboardLoading(false);
-      setIsQualityAuditLoading(false);
     }
   }
 
@@ -555,15 +502,6 @@ export function App() {
     void handleUpload(event.dataTransfer.files?.[0] ?? null);
   }
 
-  async function fetchChartSuggestions(datasetId: string) {
-    const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/charts/suggest`, {
-      method: "POST",
-    });
-
-    if (!response.ok) return [];
-    return (await response.json()) as ChartSuggestion[];
-  }
-
   async function fetchDashboard(datasetId: string, filters?: DashboardFilters) {
     const hasFilters = !!filters && hasActiveFilters(filters);
     const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/dashboard`, {
@@ -574,13 +512,6 @@ export function App() {
 
     if (!response.ok) return null;
     return (await response.json()) as DashboardPayload;
-  }
-
-  async function fetchQualityAudit(datasetId: string) {
-    const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/quality/audit`);
-
-    if (!response.ok) return null;
-    return (await response.json()) as QualityAudit;
   }
 
   async function handleApplyDashboardFilters(filters: DashboardFilters) {
@@ -707,7 +638,7 @@ export function App() {
           </div>
           <h1>Transforme planilhas em respostas, graficos e alertas de qualidade.</h1>
           <p className="hero-copy">
-            Envie CSV, Excel, TSV ou JSON, veja o perfil dos dados e faca perguntas analiticas calculadas diretamente no dataset.
+            Envie CSV, Excel, TSV ou JSON e acompanhe a evolucao mes a mes com leituras gerenciais calculadas diretamente no dataset.
           </p>
         </div>
         <label
@@ -775,7 +706,7 @@ export function App() {
           <div>
             <Download size={18} />
             <strong>Relatorio exportavel</strong>
-            <span>Resumo, qualidade, insights, graficos, recomendacoes e Power BI</span>
+            <span>Resumo, mes a mes, insights, recomendacoes e Power BI</span>
           </div>
           <div className="report-actions">
             <button disabled={!!exportingFormat} onClick={() => void handleDownloadReport("pdf")} type="button">
@@ -794,6 +725,8 @@ export function App() {
         </section>
       ) : null}
 
+      {dataset?.managerial_analysis ? <MonthlyAnalysisSection analysis={dataset.managerial_analysis} /> : null}
+
       {dataset?.managerial_analysis ? <ManagerialInsightsSection analysis={dataset.managerial_analysis} /> : null}
 
       {dataset ? (
@@ -806,122 +739,6 @@ export function App() {
           onResetFilters={handleResetDashboardFilters}
           onSettingsChange={setDashboardSettings}
         />
-      ) : null}
-
-      <section className="workspace-grid">
-        <div className="panel">
-          <div className="panel-heading">
-            <h2>Perfil do dataset</h2>
-            <span>{dataset ? `${dataset.profile.numeric_columns.length} numericas` : "Aguardando arquivo"}</span>
-          </div>
-          {dataset ? (
-            <>
-              <div className="column-list">
-                {dataset.profile.column_names.map((column) => (
-                  <span key={column}>{column}</span>
-                ))}
-              </div>
-              {dataset.profile.date_conversion_suggestions?.length ? (
-                <div className="date-suggestion-list">
-                  <strong>Sugestoes de conversao de data</strong>
-                  {dataset.profile.date_conversion_suggestions.map((suggestion) => (
-                    <p key={suggestion.column}>{suggestion.message}</p>
-                  ))}
-                </div>
-              ) : null}
-              {dataset.profile.ingest_report?.warnings?.length ? (
-                <div className="ingest-report-list">
-                  <strong>Sanidade da ingestao</strong>
-                  {dataset.profile.ingest_report.header_row_number ? (
-                    <p>
-                      Cabecalho detectado na linha {dataset.profile.ingest_report.header_row_number};{" "}
-                      {dataset.profile.ingest_report.metadata_rows_skipped ?? 0} linha(s) acima foram tratadas como metadado.
-                    </p>
-                  ) : null}
-                  {dataset.profile.ingest_report.warnings.map((warning) => (
-                    <p key={warning}>{warning}</p>
-                  ))}
-                </div>
-              ) : null}
-              <div className="chart-box">
-                <ResponsiveContainer height={220} width="100%">
-                  <BarChart data={missingChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="coluna" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="valores_ausentes" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </>
-          ) : (
-            <EmptyState text="Envie uma planilha para ver colunas, nulos e preview." />
-          )}
-        </div>
-
-        <div className="panel">
-          <div className="panel-heading">
-            <h2>Auditoria de qualidade</h2>
-            <span>{qualityAudit ? `${qualityAudit.analysis_score}/100 analise` : dataset ? `${dataset.quality.missing_total} nulos` : "Sem dados"}</span>
-          </div>
-          {dataset ? (
-            <>
-              <div className="quality-list">
-                <strong>Duplicatas: {dataset.quality.duplicate_rows}</strong>
-                <strong>Colunas vazias: {dataset.quality.empty_columns.length}</strong>
-                {dataset.quality.recommendations.map((recommendation) => (
-                  <p key={recommendation}>{recommendation}</p>
-                ))}
-              </div>
-              {dataset.quality.score_breakdown?.length ? (
-                <div className="score-breakdown-list">
-                  <strong>Formula do score</strong>
-                  {dataset.quality.score_breakdown.map((item) => (
-                    <p key={item.label}>
-                      {item.label}: peso {item.weight}, perda {item.lost_points.toLocaleString("pt-BR")} ponto(s).
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-              {dataset.quality.numeric_outlier_details?.length ? (
-                <div className="outlier-list">
-                  <strong>Outliers nomeados</strong>
-                  {dataset.quality.numeric_outlier_details.slice(0, 4).map((item) => (
-                    <p key={`${item.column}-${item.row_index}-${item.value}`}>
-                      {item.column}, linha {item.row_index}: {item.value.toLocaleString("pt-BR")} ({item.deviation_ratio}x da media)
-                    </p>
-                  ))}
-                </div>
-              ) : null}
-              {isQualityAuditLoading ? <div className="audit-loading">Revisando confiabilidade da analise...</div> : null}
-              {qualityAudit ? <QualityAuditView audit={qualityAudit} /> : null}
-            </>
-          ) : (
-            <EmptyState text="A auditoria sera gerada automaticamente apos o upload." />
-          )}
-        </div>
-      </section>
-
-      {chartSuggestions.length ? (
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>Graficos sugeridos</h2>
-            <span>{chartSuggestions.length} ideias automaticas</span>
-          </div>
-          <div className="suggested-charts">
-            {chartSuggestions.map((chart) => (
-              <article key={`${chart.type}-${chart.x}-${chart.y}`}>
-                <Lightbulb size={18} />
-                <strong>{chart.title}</strong>
-                <p>{chart.reason}</p>
-                <span>
-                  {chart.type} - {chart.x} / {chart.y}
-                </span>
-              </article>
-            ))}
-          </div>
-        </section>
       ) : null}
 
       <section className="panel">
@@ -989,10 +806,125 @@ function formatPercentCell(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? percentFormatter.format(value) : "-";
 }
 
+function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnalysis }) {
+  const monthlyComparisons = analysis.monthly_comparisons ?? [];
+  if (!monthlyComparisons.length) return null;
+
+  const metric = analysis.context.metric_map.primary_metric ?? "Metrica principal";
+  const visibleMonths = monthlyComparisons.slice(-12);
+  const latest = monthlyComparisons[monthlyComparisons.length - 1];
+  const movements = monthlyComparisons.filter((item) => typeof item.variation === "number" && Number.isFinite(item.variation));
+  const biggestIncrease = movements.reduce<ManagerialMonthlyComparison | null>(
+    (best, item) => (!best || (item.variation ?? 0) > (best.variation ?? 0) ? item : best),
+    null,
+  );
+  const biggestDrop = movements.reduce<ManagerialMonthlyComparison | null>(
+    (worst, item) => (!worst || (item.variation ?? 0) < (worst.variation ?? 0) ? item : worst),
+    null,
+  );
+  const abnormalMonths = monthlyComparisons.filter((item) => item.status === "Fora do padrao" || item.severity === "danger");
+  const chartData = visibleMonths.map((item) => ({
+    period: item.period,
+    value: item.value ?? 0,
+    variation: item.variation ?? 0,
+  }));
+
+  return (
+    <section className="panel monthly-focus-panel">
+      <div className="monthly-focus-heading">
+        <div>
+          <Clock size={20} />
+          <div>
+            <h2>Acompanhamento mes a mes</h2>
+            <span>{metric} nos ultimos {visibleMonths.length} periodo(s)</span>
+          </div>
+        </div>
+        <span className={`monthly-status severity-${latest.severity}`}>{latest.status}</span>
+      </div>
+
+      <div className="monthly-focus-kpis">
+        <article>
+          <span>Periodo atual</span>
+          <strong>{latest.period}</strong>
+          <small>{formatNumberCell(latest.value)}</small>
+        </article>
+        <article>
+          <span>Variacao mensal</span>
+          <strong>{formatSignedCell(latest.variation)}</strong>
+          <small>{formatPercentCell(latest.variation_pct)}</small>
+        </article>
+        <article>
+          <span>Maior alta</span>
+          <strong>{biggestIncrease?.period ?? "-"}</strong>
+          <small>{formatSignedCell(biggestIncrease?.variation)}</small>
+        </article>
+        <article>
+          <span>Maior queda</span>
+          <strong>{biggestDrop?.period ?? "-"}</strong>
+          <small>{formatSignedCell(biggestDrop?.variation)}</small>
+        </article>
+      </div>
+
+      <div className="monthly-focus-body">
+        <div className="monthly-chart-card">
+          <div>
+            <strong>Evolucao mensal</strong>
+            <span>linha simples para acompanhar tendencia</span>
+          </div>
+          <ResponsiveContainer height={240} width="100%">
+            <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 12, top: 14 }}>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+              <XAxis dataKey="period" minTickGap={18} tick={{ fill: "#64748b", fontSize: 12 }} />
+              <YAxis tick={{ fill: "#64748b", fontSize: 12 }} width={56} />
+              <Tooltip formatter={(value) => formatNumberCell(Number(value))} labelFormatter={(label) => `Periodo ${label}`} />
+              <Line dataKey="value" dot={{ r: 3 }} name={metric} stroke="#0f766e" strokeWidth={2.5} type="monotone" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="monthly-reading-card">
+          <strong>Leitura do mes</strong>
+          <p>{latest.managerial_reading}</p>
+          {latest.main_driver ? <span>{latest.main_driver.reading}</span> : null}
+          {abnormalMonths.length ? <small>{abnormalMonths.length} periodo(s) exigem atencao.</small> : <small>Nenhum periodo critico nos ultimos dados.</small>}
+        </div>
+      </div>
+
+      <div className="monthly-simple-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th>Valor</th>
+              <th>Variacao</th>
+              <th>%</th>
+              <th>Status</th>
+              <th>Leitura</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleMonths.map((item) => (
+              <tr key={item.period}>
+                <td>{item.period}</td>
+                <td>{formatNumberCell(item.value)}</td>
+                <td>{formatSignedCell(item.variation)}</td>
+                <td>{formatPercentCell(item.variation_pct)}</td>
+                <td>
+                  <span className={`monthly-status severity-${item.severity}`}>{item.status}</span>
+                </td>
+                <td>{item.managerial_reading}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis }) {
   const primaryMetric = analysis.context.metric_map.primary_metric ?? "Metrica nao detectada";
   const supportMetrics = Object.values(analysis.context.metric_map.support_metrics);
-  const monthlyComparisons = analysis.monthly_comparisons ?? [];
   const rootCause = analysis.root_cause_analysis ?? null;
 
   return (
@@ -1047,43 +979,6 @@ function ManagerialInsightsSection({ analysis }: { analysis: ManagerialAnalysis 
       ) : null}
 
       <RootCauseSection rootCause={rootCause} />
-
-      {monthlyComparisons.length ? (
-        <div className="managerial-monthly">
-          <div>
-            <strong>Comparativo mes a mes</strong>
-            <span>{monthlyComparisons.length} periodo(s) com leitura gerencial</span>
-          </div>
-          <div className="managerial-monthly-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Mes</th>
-                  <th>Valor</th>
-                  <th>Variacao</th>
-                  <th>%</th>
-                  <th>Status</th>
-                  <th>Apoio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyComparisons.slice(-8).map((item) => (
-                  <tr key={item.period}>
-                    <td>{item.period}</td>
-                    <td>{formatNumberCell(item.value)}</td>
-                    <td>{formatSignedCell(item.variation)}</td>
-                    <td>{formatPercentCell(item.variation_pct)}</td>
-                    <td>
-                      <span className={`monthly-status severity-${item.severity}`}>{item.status}</span>
-                    </td>
-                    <td>{item.main_driver?.reading ?? item.managerial_reading}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
 
       <div className="managerial-insight-grid">
         {analysis.insights.slice(0, 4).map((insight) => (
@@ -1245,55 +1140,6 @@ function WaterfallMiniChart({ steps }: { steps: RootCauseWaterfallStep[] }) {
 
 function EmptyState({ text }: { text: string }) {
   return <div className="empty-state">{text}</div>;
-}
-
-function QualityAuditView({ audit }: { audit: QualityAudit }) {
-  const severityLabels: Record<QualityAuditFinding["severity"], string> = {
-    critical: "Critico",
-    warning: "Atencao",
-    info: "Info",
-  };
-  const statusLabel =
-    audit.ai_status === "completed"
-      ? `IA ativa${audit.model ? ` - ${audit.model}` : ""}`
-      : audit.ai_status === "failed"
-        ? "IA indisponivel"
-        : audit.ai_status === "disabled"
-          ? "IA desativada"
-          : "Regras locais";
-
-  return (
-    <div className="quality-audit-panel">
-      <div className="quality-audit-header">
-        <div>
-          <span>Auditoria inteligente</span>
-          <strong>{audit.analysis_score}/100</strong>
-        </div>
-        <small className={`audit-mode status-${audit.ai_status}`}>{statusLabel}</small>
-      </div>
-      <p>{audit.summary}</p>
-      <div className="quality-findings">
-        {audit.findings.map((finding) => (
-          <article className={`quality-finding severity-${finding.severity}`} key={finding.id}>
-            <div>
-              <span>{severityLabels[finding.severity]}</span>
-              <strong>{finding.title}</strong>
-            </div>
-            <p>{finding.detail}</p>
-            <small>{finding.recommendation}</small>
-            {finding.evidence.length ? (
-              <ul>
-                {finding.evidence.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            ) : null}
-          </article>
-        ))}
-      </div>
-      {audit.ai_error ? <small className="audit-error">IA indisponivel: {audit.ai_error}</small> : null}
-    </div>
-  );
 }
 
 function HistoryPanel({ history, onClear }: { history: HistoryItem[]; onClear: () => void }) {

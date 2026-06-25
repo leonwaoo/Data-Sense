@@ -25,6 +25,10 @@ def build_powerbi_export(dataset: DatasetSession) -> bytes:
         package.writestr("causa_raiz.csv", _csv_bytes(pd.DataFrame(_root_cause_rows(analysis))))
         package.writestr("insights_gerenciais.csv", _csv_bytes(pd.DataFrame(_insight_rows(analysis))))
         package.writestr("graficos_sugeridos.csv", _csv_bytes(pd.DataFrame(_chart_rows(dashboard))))
+        package.writestr("indicadores_powerbi.csv", _csv_bytes(pd.DataFrame(_indicator_rows(analysis, quality))))
+        package.writestr("layout_sugerido.csv", _csv_bytes(pd.DataFrame(_layout_rows(analysis, dashboard))))
+        package.writestr("modelo_paginas.json", _json_bytes(_page_model(analysis, dashboard)))
+        package.writestr("medidas_dax.txt", _dax_measures_text(analysis))
         package.writestr("metadados.json", _json_bytes(_metadata(dataset, analysis, dashboard, quality)))
         package.writestr("README.txt", _readme_text(dataset, analysis))
 
@@ -33,15 +37,29 @@ def build_powerbi_export(dataset: DatasetSession) -> bytes:
 
 def _monthly_rows(analysis: dict) -> list[dict]:
     rows = []
+    running_year_totals: dict[int, float] = {}
+    values: list[float] = []
     for item in analysis.get("monthly_comparisons", []):
         main_driver = item.get("main_driver") or {}
+        period = str(item.get("period") or "")
+        year = _period_year(period)
+        value = _safe_float(item.get("value"))
+        if value is not None:
+            values.append(value)
+        moving_average_3m = sum(values[-3:]) / len(values[-3:]) if values else None
+        if year is not None and value is not None:
+            running_year_totals[year] = running_year_totals.get(year, 0) + value
         rows.append(
             {
-                "periodo": item.get("period"),
+                "periodo": period,
+                "ano": year,
+                "mes": _period_month(period),
                 "valor": item.get("value"),
                 "valor_anterior": item.get("previous_value"),
                 "variacao": item.get("variation"),
                 "variacao_pct": item.get("variation_pct"),
+                "media_movel_3m": _round_or_none(moving_average_3m),
+                "acumulado_ano": _round_or_none(running_year_totals.get(year)) if year is not None else None,
                 "media_historica": item.get("historical_mean"),
                 "z_score": item.get("z_score"),
                 "status": item.get("status"),
@@ -53,6 +71,141 @@ def _monthly_rows(analysis: dict) -> list[dict]:
             }
         )
     return rows
+
+
+def _indicator_rows(analysis: dict, quality: dict) -> list[dict]:
+    context = analysis.get("context") or {}
+    metric = ((context.get("metric_map") or {}).get("primary_metric")) or "metrica principal"
+    comparative = analysis.get("comparative_summary") or {}
+    variations = analysis.get("variations") or {}
+    root_cause = analysis.get("root_cause_analysis") or {}
+    rows = [
+        {
+            "indicador": "Metrica principal",
+            "valor": metric,
+            "detalhe": "Coluna inferida como principal para analise gerencial.",
+            "pagina_sugerida": "Resumo executivo",
+        },
+        {
+            "indicador": "Score de qualidade",
+            "valor": quality.get("score"),
+            "detalhe": "Usar como card de confiabilidade dos dados.",
+            "pagina_sugerida": "Resumo executivo",
+        },
+    ]
+    for key, label in [("latest", "Ultimo periodo"), ("largest_increase", "Maior alta"), ("largest_drop", "Maior queda")]:
+        movement = variations.get(key) or {}
+        if movement:
+            rows.append(
+                {
+                    "indicador": label,
+                    "valor": movement.get("period"),
+                    "detalhe": f"Valor {movement.get('value')} | variacao {movement.get('variation')}",
+                    "pagina_sugerida": "Comparativo mensal",
+                }
+            )
+    for card in comparative.get("cards", [])[:5]:
+        rows.append(
+            {
+                "indicador": card.get("label"),
+                "valor": card.get("value"),
+                "detalhe": card.get("detail"),
+                "pagina_sugerida": "Comparativos gerenciais",
+            }
+        )
+    contributor = root_cause.get("primary_contributor") or {}
+    if contributor:
+        rows.append(
+            {
+                "indicador": "Principal contribuinte",
+                "valor": contributor.get("name"),
+                "detalhe": f"Variacao {contributor.get('variation')} | participacao {contributor.get('share_of_abs_change')}",
+                "pagina_sugerida": "Causa raiz",
+            }
+        )
+    return rows
+
+
+def _layout_rows(analysis: dict, dashboard: dict) -> list[dict]:
+    rows = [
+        {
+            "pagina": "Resumo executivo",
+            "ordem": 1,
+            "visual": "Cards KPI",
+            "campos": "indicador, valor",
+            "objetivo": "Mostrar metrica principal, score de qualidade, ultimo periodo, maior alta e maior queda.",
+        },
+        {
+            "pagina": "Comparativo mensal",
+            "ordem": 1,
+            "visual": "Grafico de linhas",
+            "campos": "comparativo_mensal[periodo], comparativo_mensal[valor]",
+            "objetivo": "Acompanhar evolucao mensal da metrica principal.",
+        },
+        {
+            "pagina": "Comparativo mensal",
+            "ordem": 2,
+            "visual": "Colunas agrupadas",
+            "campos": "comparativo_mensal[periodo], comparativo_mensal[variacao]",
+            "objetivo": "Comparar mes contra mes.",
+        },
+        {
+            "pagina": "Causa raiz",
+            "ordem": 1,
+            "visual": "Waterfall",
+            "campos": "causa_raiz[entidade], causa_raiz[variacao]",
+            "objetivo": "Mostrar os passos que explicam a alta ou queda.",
+        },
+        {
+            "pagina": "Causa raiz",
+            "ordem": 2,
+            "visual": "Barras horizontais",
+            "campos": "causa_raiz[entidade], causa_raiz[participacao_mudanca_abs]",
+            "objetivo": "Mostrar quem concentrou a variacao.",
+        },
+        {
+            "pagina": "Narrativa executiva",
+            "ordem": 1,
+            "visual": "Tabela ou cards de texto",
+            "campos": "insights_gerenciais[titulo], insights_gerenciais[impacto_gerencial], insights_gerenciais[recomendacao]",
+            "objetivo": "Transformar achados em leitura para decisao.",
+        },
+    ]
+    for chart in _chart_rows(dashboard):
+        rows.append(
+            {
+                "pagina": "Graficos sugeridos",
+                "ordem": chart.get("ordem_sugerida"),
+                "visual": chart.get("visual_power_bi_sugerido"),
+                "campos": f"{chart.get('eixo')} x {chart.get('valor')}",
+                "objetivo": chart.get("explicacao"),
+            }
+        )
+    return rows
+
+
+def _page_model(analysis: dict, dashboard: dict) -> dict:
+    context = analysis.get("context") or {}
+    return {
+        "nome_modelo": "DataSense Power BI Starter",
+        "dominio": context.get("domain"),
+        "metrica_principal": ((context.get("metric_map") or {}).get("primary_metric")),
+        "tabelas": [
+            {"nome": "dados_tratados", "uso": "base principal"},
+            {"nome": "comparativo_mensal", "uso": "serie temporal, MoM, media movel e acumulado"},
+            {"nome": "causa_raiz", "uso": "waterfall e ranking de contribuicao"},
+            {"nome": "insights_gerenciais", "uso": "narrativa executiva"},
+            {"nome": "indicadores_powerbi", "uso": "cards executivos"},
+        ],
+        "paginas": [
+            {"nome": "Resumo executivo", "visuais": ["Cards KPI", "Alertas", "Recomendacoes"]},
+            {"nome": "Comparativo mensal", "visuais": ["Linha mensal", "Variacao MoM", "Tabela mensal"]},
+            {"nome": "Causa raiz", "visuais": ["Waterfall", "Ranking de contribuicao", "Alertas de concentracao"]},
+            {"nome": "Narrativa executiva", "visuais": ["Insights", "Perguntas sugeridas"]},
+            {"nome": "Qualidade dos dados", "visuais": ["Score", "Nulos", "Duplicatas", "Outliers"]},
+        ],
+        "graficos_datasense": dashboard.get("charts", []),
+    }
 
 
 def _insight_rows(analysis: dict) -> list[dict]:
@@ -173,6 +326,54 @@ def _metadata(dataset: DatasetSession, analysis: dict, dashboard: dict, quality:
     }
 
 
+def _dax_measures_text(analysis: dict) -> str:
+    metric = ((analysis.get("context") or {}).get("metric_map") or {}).get("primary_metric") or "valor"
+    safe_metric = str(metric).replace("]", "]]")
+    return "\n".join(
+        [
+            "Medidas DAX sugeridas - DataSense",
+            "",
+            "-- Ajuste o nome da tabela/coluna caso voce renomeie os campos no Power BI.",
+            f"Total Metrica = SUM('dados_tratados'[{safe_metric}])",
+            "",
+            f"Media Metrica = AVERAGE('dados_tratados'[{safe_metric}])",
+            "",
+            "Valor Mes Anterior =",
+            "CALCULATE(",
+            "    [Total Metrica],",
+            "    DATEADD('Calendario'[Data], -1, MONTH)",
+            ")",
+            "",
+            "Variacao MoM = [Total Metrica] - [Valor Mes Anterior]",
+            "",
+            "Variacao MoM % = DIVIDE([Variacao MoM], [Valor Mes Anterior])",
+            "",
+            "Acumulado Ano = TOTALYTD([Total Metrica], 'Calendario'[Data])",
+            "",
+            "Media Movel 3M =",
+            "AVERAGEX(",
+            "    DATESINPERIOD('Calendario'[Data], MAX('Calendario'[Data]), -3, MONTH),",
+            "    [Total Metrica]",
+            ")",
+            "",
+            "Participacao Contribuicao =",
+            "DIVIDE(",
+            "    SUM('causa_raiz'[participacao_mudanca_abs]),",
+            "    CALCULATE(SUM('causa_raiz'[participacao_mudanca_abs]), ALL('causa_raiz'[entidade]))",
+            ")",
+            "",
+            "Mes Fora do Padrao =",
+            "IF(MAX('comparativo_mensal'[severidade]) IN {\"danger\", \"warning\"}, 1, 0)",
+            "",
+            "Score Qualidade =",
+            "MAXX(",
+            "    FILTER('indicadores_powerbi', 'indicadores_powerbi'[indicador] = \"Score de qualidade\"),",
+            "    VALUE('indicadores_powerbi'[valor])",
+            ")",
+        ]
+    )
+
+
 def _readme_text(dataset: DatasetSession, analysis: dict) -> str:
     primary_metric = ((analysis.get("context") or {}).get("metric_map") or {}).get("primary_metric") or "metrica principal"
     return "\n".join(
@@ -188,6 +389,14 @@ def _readme_text(dataset: DatasetSession, analysis: dict) -> str:
             "4. Importe causa_raiz.csv para criar waterfall, ranking de contribuicao e leitura de quem puxou a mudanca.",
             "5. Importe insights_gerenciais.csv para criar uma pagina de narrativa executiva.",
             "6. Use graficos_sugeridos.csv como roteiro para montar visuais equivalentes.",
+            "7. Abra medidas_dax.txt e copie as medidas sugeridas para o modelo.",
+            "8. Use modelo_paginas.json e layout_sugerido.csv como guia de paginas e posicionamento.",
+            "",
+            "Arquivos de apoio:",
+            "- medidas_dax.txt: medidas DAX iniciais para total, MoM, acumulado, media movel e participacao.",
+            "- modelo_paginas.json: estrutura sugerida de paginas, tabelas e visuais.",
+            "- layout_sugerido.csv: roteiro visual com pagina, ordem, campos e objetivo.",
+            "- indicadores_powerbi.csv: KPIs prontos para cards executivos.",
             "",
             "Graficos recomendados:",
             f"- Linha: periodo x {primary_metric}.",
@@ -210,6 +419,33 @@ def _powerbi_visual(chart_type: str | None) -> str:
     if chart_type == "pie":
         return "Grafico de rosca"
     return "Tabela ou grafico automatico"
+
+
+def _period_year(period: str) -> int | None:
+    try:
+        return int(str(period)[:4])
+    except (TypeError, ValueError):
+        return None
+
+
+def _period_month(period: str) -> int | None:
+    try:
+        return int(str(period)[5:7])
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float(value: object) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if pd.notna(parsed) else None
+
+
+def _round_or_none(value: object) -> float | None:
+    parsed = _safe_float(value)
+    return round(parsed, 4) if parsed is not None else None
 
 
 def _csv_bytes(dataframe: pd.DataFrame) -> bytes:

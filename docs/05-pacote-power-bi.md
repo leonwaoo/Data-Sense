@@ -31,6 +31,10 @@ O arquivo `.zip` gerado contem:
 - `causa_raiz.csv`: contribuintes da mudanca, participacao na variacao e passos do waterfall para explicar quem puxou alta ou queda.
 - `insights_gerenciais.csv`: principais insights, alertas e recomendacoes calculados pelo DataSense.
 - `graficos_sugeridos.csv`: lista de visuais recomendados, com tipo de grafico, eixo, metrica e objetivo.
+- `indicadores_powerbi.csv`: KPIs executivos prontos para cards, como metrica principal, qualidade, maiores movimentos e principal contribuinte.
+- `layout_sugerido.csv`: roteiro de paginas, ordem dos visuais, campos e objetivo de cada visual.
+- `modelo_paginas.json`: estrutura recomendada de paginas, tabelas e visuais.
+- `medidas_dax.txt`: medidas DAX sugeridas para total, media, MoM, acumulado, media movel e participacao.
 - `metadados.json`: mapeamento de colunas, dominio detectado, metricas principais e contexto da analise.
 - `README.txt`: guia rapido para importar e montar o relatorio no Power BI.
 
@@ -40,8 +44,10 @@ O arquivo `.zip` gerado contem:
 2. Importar `comparativo_mensal.csv` para criar paginas de evolucao temporal.
 3. Importar `causa_raiz.csv` para montar waterfall e ranking de contribuicao.
 4. Usar `insights_gerenciais.csv` para montar uma pagina executiva com alertas e recomendacoes.
-5. Consultar `graficos_sugeridos.csv` para escolher os visuais iniciais.
-6. Usar `metadados.json` como referencia para entender quais colunas foram usadas como metrica, tempo e dimensao.
+5. Importar `indicadores_powerbi.csv` para criar cards executivos.
+6. Consultar `graficos_sugeridos.csv`, `layout_sugerido.csv` e `modelo_paginas.json` para escolher os visuais iniciais.
+7. Copiar as medidas de `medidas_dax.txt` e ajustar nomes caso voce renomeie tabelas ou colunas.
+8. Usar `metadados.json` como referencia para entender quais colunas foram usadas como metrica, tempo e dimensao.
 
 ## Paginas sugeridas
 
@@ -67,7 +73,7 @@ Variacao MoM % = DIVIDE([Variacao MoM], CALCULATE([Total Metrica], DATEADD('Cale
 Acumulado Ano = TOTALYTD([Total Metrica], 'Calendario'[Data])
 ```
 
-Os nomes das colunas devem ser ajustados de acordo com a base carregada.
+O arquivo `medidas_dax.txt` gerado pelo DataSense ja usa a metrica principal detectada no upload. Mesmo assim, revise nomes de tabelas/colunas se voce renomear campos dentro do Power BI.
 
 ## Status
 

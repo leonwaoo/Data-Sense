@@ -33,7 +33,13 @@ DOMAIN_RULES = [
         "primary_metrics": ["valor_total", "receita", "faturamento", "valor_venda", "venda", "sales", "revenue"],
         "support_groups": {
             "quantidade": ["quantidade", "qtd", "volume", "unidade"],
+            "volume_vendido": ["volume_vendido", "volume", "vendido", "ton", "kg"],
+            "qtd_pedidos": ["qtd_pedidos", "pedidos", "pedido"],
             "desconto": ["desconto", "abatimento"],
+            "devolucoes": ["devolucao", "devolucoes", "retorno", "cancelamento"],
+            "oee": ["oee", "eficiencia"],
+            "taxa_aprovacao": ["taxa_aprovacao", "aprovacao", "aprovado"],
+            "margem_ebitda": ["margem_ebitda", "ebitda", "margem"],
             "custo": ["custo", "cost"],
         },
         "dimensions": ["produto", "cliente", "categoria", "canal", "regiao", "vendedor"],

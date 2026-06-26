@@ -15,6 +15,7 @@ from app.services.column_heuristics import (
     slug as _slug,
 )
 from app.services.date_utils import parse_common_dates
+from app.services.managerial_context_service import build_time_context
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
@@ -87,20 +88,22 @@ DOMAIN_CANDIDATES = [
 def build_dashboard(dataset: DatasetSession, filters: dict | None = None) -> dict:
     base_profile = build_profile(dataset)
     base_domain = _detect_domain(base_profile["column_names"])
+    base_time_context = build_time_context(dataset.dataframe, base_profile)
     base_date_column = _select_date_column(dataset.dataframe, base_profile["datetime_columns"], base_profile["column_names"])
     base_dimensions = _select_dimensions(base_profile["categorical_columns"])
-    filtered_dataset, applied_filters = _apply_filters(dataset, filters or {}, base_date_column, base_dimensions)
+    filtered_dataset, applied_filters = _apply_filters(dataset, filters or {}, base_time_context, base_date_column, base_dimensions)
 
     df = filtered_dataset.dataframe
     profile = build_profile(filtered_dataset)
     quality = build_quality_report(filtered_dataset)
     domain = _detect_domain(profile["column_names"])
     main_metric = _select_main_metric(df, profile["numeric_columns"], domain["type"])
+    time_context = build_time_context(df, profile)
     date_column = _select_date_column(df, profile["datetime_columns"], profile["column_names"])
     dimensions = _select_dimensions(profile["categorical_columns"])
 
-    kpis = _build_kpis(filtered_dataset, quality, main_metric, date_column)
-    charts, insights = _build_charts(filtered_dataset, quality, main_metric, date_column, dimensions)
+    kpis = _build_kpis(filtered_dataset, quality, main_metric, time_context, date_column)
+    charts, insights = _build_charts(filtered_dataset, quality, main_metric, time_context, date_column, dimensions)
     insights.extend(_quality_insights(quality))
 
     if not charts:
@@ -113,7 +116,7 @@ def build_dashboard(dataset: DatasetSession, filters: dict | None = None) -> dic
         "kpis": kpis,
         "charts": charts,
         "insights": insights[:6],
-        "filters": _build_filter_options(dataset, base_date_column, base_dimensions, applied_filters),
+        "filters": _build_filter_options(dataset, base_time_context, base_date_column, base_dimensions, applied_filters),
         "quality": {
             "score": quality["score"],
             "score_breakdown": quality.get("score_breakdown", []),
@@ -130,6 +133,7 @@ def _build_kpis(
     dataset: DatasetSession,
     quality: dict,
     main_metric: str | None,
+    time_context: dict,
     date_column: str | None,
 ) -> list[dict]:
     df = dataset.dataframe
@@ -177,8 +181,8 @@ def _build_kpis(
                 },
             )
 
-    if date_column:
-        parsed_dates = _parse_dates(df[date_column]).dropna()
+    if time_context.get("available"):
+        parsed_dates = time_context["series"].dropna()
         if not parsed_dates.empty:
             kpis.append(
                 {
@@ -196,14 +200,16 @@ def _build_charts(
     dataset: DatasetSession,
     quality: dict,
     main_metric: str | None,
+    time_context: dict,
     date_column: str | None,
     dimensions: list[tuple[str, str]],
 ) -> tuple[list[dict], list[str]]:
     charts: list[dict] = []
     insights: list[str] = []
+    numeric_columns = build_profile(dataset)["numeric_columns"]
 
-    if main_metric and date_column:
-        monthly = _monthly_chart(dataset, date_column, main_metric)
+    if main_metric and time_context.get("available"):
+        monthly = _monthly_chart(dataset, time_context, date_column, main_metric)
         if monthly:
             charts.append(monthly["chart"])
             insights.append(monthly["insight"])
@@ -214,6 +220,11 @@ def _build_charts(
             if ranking:
                 charts.append(ranking["chart"])
                 insights.append(ranking["insight"])
+            margin_ranking = _margin_ranking_chart(dataset, column, profile_numeric_columns=numeric_columns)
+            if margin_ranking:
+                charts.append(margin_ranking["chart"])
+                insights.append(margin_ranking["insight"])
+                break
 
     missing_chart = _missing_chart(dataset, quality)
     if missing_chart:
@@ -223,9 +234,10 @@ def _build_charts(
     return charts[:5], insights
 
 
-def _monthly_chart(dataset: DatasetSession, date_column: str, metric_column: str) -> dict | None:
+def _monthly_chart(dataset: DatasetSession, time_context: dict, date_column: str | None, metric_column: str) -> dict | None:
     df = dataset.dataframe.copy()
-    df["_periodo"] = _parse_dates(df[date_column]).dt.to_period("M").astype(str)
+    date_label = time_context.get("label") or date_column or "periodo"
+    df["_periodo"] = time_context["series"].dt.to_period("M").astype(str)
     df["_valor"] = pd.to_numeric(df[metric_column], errors="coerce")
     df = df[df["_periodo"].ne("NaT") & df["_valor"].notna()]
     if df.empty:
@@ -247,12 +259,12 @@ def _monthly_chart(dataset: DatasetSession, date_column: str, metric_column: str
         "chart": {
             "id": "evolucao_mensal",
             "title": "Evolucao por mes",
-            "subtitle": f"Soma de {metric_column} por {date_column}",
+            "subtitle": f"Soma de {metric_column} por {date_label}",
             "type": "line",
             "x": "periodo",
             "y": "total",
             "data": result.to_dict(orient="records"),
-            "filter_column": date_column,
+            "filter_column": date_column or date_label,
             "period_grain": "month",
             "insight": movement or f"Maior periodo: {best['periodo']} com {_format_number(best['total'])}.",
             "available_types": ["line", "area", "bar"],
@@ -296,6 +308,47 @@ def _ranking_chart(dataset: DatasetSession, group_column: str, metric_column: st
             "available_types": ["bar", "line", "pie"],
         },
         "insight": f"Oportunidade: {top['grupo']} lidera o ranking por {label} com {share:.1%} do top 8.",
+    }
+
+
+def _margin_ranking_chart(dataset: DatasetSession, group_column: str, profile_numeric_columns: list[str]) -> dict | None:
+    margin_column = _first_matching(profile_numeric_columns, ["margem_ebitda", "margem", "markup", "ebitda"])
+    if not margin_column or group_column not in dataset.dataframe.columns:
+        return None
+
+    df = dataset.dataframe.copy()
+    df["_grupo"] = df[group_column].astype("string")
+    df["_margem"] = pd.to_numeric(df[margin_column], errors="coerce")
+    df = df[df["_grupo"].notna() & df["_margem"].notna()]
+    if df.empty:
+        return None
+
+    result = (
+        df.groupby("_grupo", as_index=False)["_margem"]
+        .mean()
+        .rename(columns={"_grupo": "grupo", "_margem": "margem_media"})
+        .sort_values("margem_media", ascending=False)
+        .head(8)
+        .round(2)
+    )
+    if result.empty:
+        return None
+
+    top = result.iloc[0]
+    return {
+        "chart": {
+            "id": f"ranking_margem_{_slug(group_column)}",
+            "title": f"Margem por {_display_label(group_column, 32)}",
+            "subtitle": f"Media de {margin_column}; ajuda a comparar rentabilidade, nao so volume",
+            "type": "bar",
+            "x": "grupo",
+            "y": "margem_media",
+            "data": result.to_dict(orient="records"),
+            "filter_column": group_column,
+            "insight": f"Maior margem media: {top['grupo']} com {_format_number(top['margem_media'])}.",
+            "available_types": ["bar", "line", "pie"],
+        },
+        "insight": f"Rentabilidade: {top['grupo']} lidera em margem media, mesmo que nao lidere em receita.",
     }
 
 
@@ -390,6 +443,7 @@ def _monthly_movement(result: pd.DataFrame) -> str | None:
 def _apply_filters(
     dataset: DatasetSession,
     filters: dict,
+    time_context: dict,
     date_column: str | None,
     dimensions: list[tuple[str, str]],
 ) -> tuple[DatasetSession, dict]:
@@ -404,8 +458,8 @@ def _apply_filters(
 
     date_from = str(filters.get("date_from") or "").strip()
     date_to = str(filters.get("date_to") or "").strip()
-    if date_column and (date_from or date_to):
-        parsed_dates = _parse_dates(df[date_column])
+    if time_context.get("available") and (date_from or date_to):
+        parsed_dates = time_context["series"]
         if date_from:
             start = pd.to_datetime(date_from, errors="coerce")
             if pd.notna(start):
@@ -444,16 +498,17 @@ def _apply_filters(
 
 def _build_filter_options(
     dataset: DatasetSession,
+    time_context: dict,
     date_column: str | None,
     dimensions: list[tuple[str, str]],
     applied_filters: dict,
 ) -> dict:
     date_filter = None
-    if date_column:
-        parsed_dates = _parse_dates(dataset.dataframe[date_column]).dropna()
+    if time_context.get("available"):
+        parsed_dates = time_context["series"].dropna()
         if not parsed_dates.empty:
             date_filter = {
-                "column": date_column,
+                "column": date_column or time_context.get("label") or "periodo",
                 "min": str(parsed_dates.min().date()),
                 "max": str(parsed_dates.max().date()),
                 "selected_from": applied_filters.get("date_from"),

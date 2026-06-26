@@ -271,7 +271,7 @@ def _root_cause_analysis(
         "dimension_impact_ranking": dimension_impact_ranking,
         "dimension_narratives": dimension_narratives,
         "concentration_alerts": concentration_alerts,
-        "supporting_metrics": driver_evidence[:4],
+        "supporting_metrics": driver_evidence[:8],
         "waterfall": waterfall,
         "summary": summary,
         "confidence": _root_cause_confidence(top_contributor, driver_evidence, primary_dimension),
@@ -328,6 +328,7 @@ def _root_dimension_drivers(
             axis=1,
         )
         comparison = comparison.sort_values("variation", key=lambda values: values.abs(), ascending=False)
+        context_by_name = _contributor_context(prepared, column, focus_period, dimensions)
         contributors = [
             {
                 "name": str(row["name"]),
@@ -341,6 +342,7 @@ def _root_dimension_drivers(
                 "historical_delta": _round_or_none(row["historical_delta"]),
                 "concentration_level": row["concentration_level"],
                 "recurrence_flag": row["recurrence_flag"],
+                "context": context_by_name.get(str(row["name"]), []),
             }
             for _, row in comparison.head(8).iterrows()
         ]
@@ -354,6 +356,43 @@ def _root_dimension_drivers(
         )
 
     return drivers
+
+
+def _contributor_context(prepared: pd.DataFrame, dimension_column: str, focus_period: str, dimensions: list[dict]) -> dict[str, list[dict]]:
+    current = prepared[prepared["_periodo"] == focus_period]
+    if current.empty or dimension_column not in current.columns:
+        return {}
+
+    related_dimensions = [
+        item["column"]
+        for item in dimensions
+        if item.get("column") != dimension_column and item.get("column") in current.columns
+    ][:3]
+    if not related_dimensions:
+        return {}
+
+    result: dict[str, list[dict]] = {}
+    for name, group in current.groupby(dimension_column):
+        entries = []
+        for related in related_dimensions:
+            related_group = (
+                group.groupby(related)["_valor_principal"]
+                .sum()
+                .sort_values(ascending=False)
+                .head(1)
+            )
+            if related_group.empty:
+                continue
+            entries.append(
+                {
+                    "dimension": related,
+                    "name": str(related_group.index[0]),
+                    "value": _round_or_none(float(related_group.iloc[0])),
+                }
+            )
+        if entries:
+            result[str(name)] = entries
+    return result
 
 
 def _dimension_impact_ranking(dimension_drivers: list[dict], focus_period: str) -> list[dict]:
@@ -379,6 +418,7 @@ def _dimension_impact_ranking(dimension_drivers: list[dict], focus_period: str) 
                     "historical_delta": contributor.get("historical_delta"),
                     "concentration_level": contributor.get("concentration_level"),
                     "recurrence_flag": contributor.get("recurrence_flag"),
+                    "context": contributor.get("context", []),
                     "reading": (
                         f"{contributor.get('name')} em {driver.get('label')} respondeu por "
                         f"{_format_pct(share_abs)} da variacao absoluta em {focus_period}, com "
@@ -476,7 +516,8 @@ def _dimension_narrative_text(
             f"ou ruptura de estoque nesse recorte."
         )
     if domain_type == "vendas":
-        return f"{base} O movimento aponta mudanca de mix, cliente ou canal com impacto comercial direto."
+        context_text = _context_sentence(top)
+        return f"{base} O movimento aponta mudanca de mix, cliente ou canal com impacto comercial direto.{context_text}"
     if domain_type == "compras":
         return f"{base} O sinal e compativel com dependencia de fornecedor, item critico ou variacao de prazo/custo."
     if domain_type == "financeiro":
@@ -516,7 +557,8 @@ def _dimension_recommendation(domain_type: str, dimension_label: str, top: dict,
     if domain_type == "estoque_operacao":
         return f"Validar movimentacoes de {name} em {dimension_label}, incluindo consumo, reposicao e transferencias do periodo."
     if domain_type == "vendas":
-        return f"Revisar carteira e mix de {name} em {dimension_label}, comparando canal, cliente e ticket contra a media recente."
+        context_text = _context_sentence(top, prefix=" Cruzar tambem com")
+        return f"Revisar carteira e mix de {name} em {dimension_label}, comparando canal, cliente e ticket contra a media recente.{context_text}"
     if domain_type == "compras":
         return f"Auditar {name} em {dimension_label} com foco em prazo, custo e dependencia operacional."
     if share_abs >= 0.8:
@@ -982,8 +1024,13 @@ def _driver_evidence(period_metrics: pd.DataFrame, metric_map: dict, movement: p
     focus_index = int(movement.name) if isinstance(movement.name, int) else period_metrics.index[period_metrics["periodo"] == movement["periodo"]][0]
     previous_row = period_metrics.iloc[focus_index - 1] if focus_index > 0 else None
     direction = "subiu" if float(movement["variacao"]) >= 0 else "caiu"
+    seen_columns: set[str] = set()
 
     for group_name, column in metric_map["support_metrics"].items():
+        normalized_column = _normalize_text(column)
+        if normalized_column in seen_columns:
+            continue
+        seen_columns.add(normalized_column)
         if group_name not in period_metrics.columns:
             continue
 
@@ -1253,7 +1300,7 @@ def _alerts(
     period_label = str(focus.get("periodo") or "periodo analisado")
     variation_pct = _safe_float(focus.get("variacao_pct")) or 0
     if not abnormal_periods.empty:
-        alerts.append(f"{abnormal_periods.shape[0]} periodo(s) tiveram variacao acima do padrao historico.")
+        alerts.append(_abnormal_periods_alert(abnormal_periods))
     if abs(variation_pct) >= 0.5:
         alerts.append(f"Movimento critico em {period_label}: {_format_pct(variation_pct)}.")
         if variation_pct <= -0.5:
@@ -1266,6 +1313,17 @@ def _alerts(
     alerts.extend(_support_metric_alerts(period_metrics, metric_map, focus))
     alerts.extend(_dimension_alerts(root_cause_analysis or {}))
     return alerts or ["Nenhum alerta critico adicional na leitura gerencial inicial."]
+
+
+def _abnormal_periods_alert(abnormal_periods: pd.DataFrame) -> str:
+    named = []
+    for _, row in abnormal_periods.head(5).iterrows():
+        named.append(
+            f"{row['periodo']} ({_format_signed_number(_safe_float(row.get('variacao')))}; "
+            f"{_format_pct(_safe_float(row.get('variacao_pct')))})"
+        )
+    suffix = "..." if abnormal_periods.shape[0] > 5 else ""
+    return f"{abnormal_periods.shape[0]} periodo(s) fora do padrao historico: {', '.join(named)}{suffix}."
 
 
 def _support_metric_alerts(period_metrics: pd.DataFrame, metric_map: dict, focus: pd.Series) -> list[str]:
@@ -1510,7 +1568,17 @@ def _generic_cause(domain_type: str, direction: str) -> str:
 
 
 def _is_additive_support(group_name: str) -> bool:
-    return group_name not in {"custo", "prazo", "margem"}
+    return group_name not in {"custo", "prazo", "margem", "margem_ebitda", "oee", "taxa_aprovacao", "desconto"}
+
+
+def _context_sentence(top: dict, prefix: str = " No periodo, o maior cruzamento observado foi") -> str:
+    context = top.get("context") or []
+    if not context:
+        return ""
+    parts = [f"{item.get('dimension')}: {item.get('name')}" for item in context[:2] if item.get("name")]
+    if not parts:
+        return ""
+    return f"{prefix} {', '.join(parts)}."
 
 
 def _format_signed_number(value: float | None) -> str:

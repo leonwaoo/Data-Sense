@@ -7,6 +7,7 @@ from app.services.managerial_analysis_service import (
     _map_metrics,
     build_managerial_analysis,
 )
+from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile
 
 
@@ -95,6 +96,36 @@ def _sales_client_channel_dataset() -> DatasetSession:
         }
     )
     return DatasetSession(dataset_id="teste-vendas", file_name="vendas.xlsx", dataframe=dataframe)
+
+
+def _rich_sales_dataset() -> DatasetSession:
+    dataframe = pd.DataFrame(
+        {
+            "Ano": [2024, 2024, 2024, 2024, 2024, 2024, 2024, 2024],
+            "Month": ["SET", "SET", "OUT", "OUT", "NOV", "NOV", "DEZ", "DEZ"],
+            "Cliente": [
+                "Distribuidora Centro",
+                "Cliente B",
+                "Distribuidora Centro",
+                "Cliente B",
+                "Distribuidora Centro",
+                "Cliente B",
+                "Distribuidora Centro",
+                "Cliente B",
+            ],
+            "Canal": ["E-commerce", "Loja", "E-commerce", "Loja", "E-commerce", "Loja", "E-commerce", "Loja"],
+            "Produto": ["Cafe Robusta", "Cafe Organico", "Cafe Robusta", "Cafe Organico", "Cafe Robusta", "Cafe Organico", "Cafe Robusta", "Cafe Organico"],
+            "Receita": [100, 80, 120, 90, 130, 95, 660, 100],
+            "Qtd Pedidos": [5, 4, 6, 4, 7, 5, 28, 5],
+            "Volume Vendido": [50, 20, 55, 22, 58, 25, 260, 24],
+            "Desconto (%)": [0.05, 0.02, 0.05, 0.02, 0.06, 0.02, 0.08, 0.02],
+            "Devolucoes": [0, 0, 1, 0, 1, 0, 3, 0],
+            "OEE": [0.81, 0.79, 0.82, 0.8, 0.83, 0.8, 0.76, 0.81],
+            "Taxa Aprovacao": [0.92, 0.93, 0.91, 0.94, 0.9, 0.94, 0.86, 0.95],
+            "Margem EBITDA": [0.18, 0.38, 0.19, 0.39, 0.2, 0.4, 0.17, 0.42],
+        }
+    )
+    return DatasetSession(dataset_id="teste-vendas-rico", file_name="vendas_rico.xlsx", dataframe=dataframe)
 
 
 def _purchase_supplier_item_dataset() -> DatasetSession:
@@ -205,6 +236,31 @@ def test_managerial_analysis_uses_client_and_channel_for_sales() -> None:
     assert "Canal" in labels
     assert "Cliente" in ranking_labels
     assert analysis["dimension_narratives"]
+
+
+def test_managerial_analysis_uses_rich_sales_support_metrics_and_cross_context() -> None:
+    analysis = build_managerial_analysis(_rich_sales_dataset())
+
+    support_columns = set(analysis["context"]["metric_map"]["support_metrics"].values())
+    ranking = analysis["root_cause_analysis"]["dimension_impact_ranking"]
+    centro = next(item for item in ranking if item["name"] == "Distribuidora Centro")
+    alerts = analysis["alerts"]
+
+    assert {"Qtd Pedidos", "Volume Vendido", "Desconto (%)", "Devolucoes", "OEE", "Taxa Aprovacao", "Margem EBITDA"}.issubset(support_columns)
+    assert any(item["dimension"] == "Canal" and item["name"] == "E-commerce" for item in centro["context"])
+    assert any(item["dimension"] == "Produto" and item["name"] == "Cafe Robusta" for item in centro["context"])
+    assert any("2024-12" in alert for alert in alerts)
+
+
+def test_dashboard_uses_year_month_context_and_margin_ranking() -> None:
+    dashboard = build_dashboard(_rich_sales_dataset())
+    monthly = next(chart for chart in dashboard["charts"] if chart["id"] == "evolucao_mensal")
+    margin = next(chart for chart in dashboard["charts"] if chart["id"].startswith("ranking_margem_"))
+
+    periods = [row["periodo"] for row in monthly["data"]]
+    assert periods == ["2024-09", "2024-10", "2024-11", "2024-12"]
+    assert not any(str(period).startswith("2000-") for period in periods)
+    assert margin["data"][0]["grupo"] == "Cafe Organico"
 
 
 def test_managerial_analysis_uses_supplier_and_item_for_purchases() -> None:

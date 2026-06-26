@@ -109,8 +109,8 @@ def dataset_quality(dataset_id: str) -> dict:
 
 
 @app.get("/datasets/{dataset_id}/quality/audit")
-def dataset_quality_audit(dataset_id: str) -> dict:
-    return build_quality_audit(get_dataset(dataset_id))
+def dataset_quality_audit(dataset_id: str, model: str | None = None) -> dict:
+    return build_quality_audit(get_dataset(dataset_id), requested_model=model)
 
 
 @app.get("/datasets/{dataset_id}/managerial-analysis")
@@ -119,8 +119,8 @@ def dataset_managerial_analysis(dataset_id: str) -> dict:
 
 
 @app.get("/datasets/{dataset_id}/managerial-analysis/ai")
-def dataset_managerial_ai_review(dataset_id: str) -> dict:
-    return build_managerial_ai_review(get_dataset(dataset_id))
+def dataset_managerial_ai_review(dataset_id: str, model: str | None = None) -> dict:
+    return build_managerial_ai_review(get_dataset(dataset_id), requested_model=model)
 
 
 @app.post("/datasets/{dataset_id}/ask")

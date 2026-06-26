@@ -1,27 +1,26 @@
 import json
 import os
-import urllib.error
-import urllib.request
 from typing import Any
 
 from app.models import DatasetSession
-from app.services.ai_quality_service import (
-    DEFAULT_OPENAI_MODEL,
-    OPENAI_RESPONSES_URL,
-    _extract_output_text,
-    _has_real_api_key,
-    _safe_error_message,
+from app.services.ai_provider_service import (
+    has_real_api_key as _has_real_api_key,
+    request_openrouter_json,
+    resolve_ai_credentials,
+    safe_ai_error_message as _safe_error_message,
 )
 from app.services.managerial_analysis_service import build_managerial_analysis
 
 
-def build_managerial_ai_review(dataset: DatasetSession) -> dict:
+def build_managerial_ai_review(dataset: DatasetSession, requested_model: str | None = None) -> dict:
     analysis = build_managerial_analysis(dataset)
     evidence = _managerial_evidence_package(dataset, analysis)
     local_review = _local_managerial_review(evidence)
 
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    model = os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
+    credentials = resolve_ai_credentials(requested_model)
+    api_key = credentials["api_key"]
+    model = credentials["model"]
+    provider = credentials["provider"]
     if not _has_real_api_key(api_key):
         return {
             **local_review,
@@ -37,12 +36,13 @@ def build_managerial_ai_review(dataset: DatasetSession) -> dict:
             "ai_enabled": True,
             "ai_status": "disabled",
             "model": model,
+            "provider": provider,
             "evidence_package": evidence,
         }
 
     try:
         ai_payload = _request_ai_managerial_review(evidence, local_review, api_key, model)
-        return _merge_ai_managerial_review(local_review, ai_payload, model, evidence)
+        return _merge_ai_managerial_review(local_review, ai_payload, model, evidence, provider)
     except Exception as exc:
         return {
             **local_review,
@@ -50,6 +50,7 @@ def build_managerial_ai_review(dataset: DatasetSession) -> dict:
             "ai_status": "failed",
             "ai_error": _safe_error_message(exc),
             "model": model,
+            "provider": provider,
             "evidence_package": evidence,
         }
 
@@ -160,62 +161,38 @@ def _local_managerial_review(evidence: dict) -> dict:
 
 
 def _request_ai_managerial_review(evidence: dict, local_review: dict, api_key: str, model: str) -> dict:
-    url = os.getenv("OPENAI_RESPONSES_URL", OPENAI_RESPONSES_URL).strip() or OPENAI_RESPONSES_URL
-    body = {
-        "model": model,
-        "instructions": (
+    return request_openrouter_json(
+        system_prompt=(
             "Voce e uma segunda leitura gerencial do DataSense para gestores. "
             "Use apenas as evidencias calculadas pelo backend; nao invente valores, causas nem nomes. "
             "Transforme variacoes, drivers, ranking de contribuicao, alertas e limitacoes em narrativa executiva. "
-            "Sempre diferencie fato calculado de causa provavel. Responda em portugues do Brasil."
+            "Sempre diferencie fato calculado de causa provavel. Responda em portugues do Brasil. "
+            "O JSON deve conter: executive_summary, what_changed, likely_causes, managerial_impact, "
+            "recommendations, investigation_questions e confidence."
         ),
-        "input": json.dumps(
-            {
-                "evidence": evidence,
-                "local_review": {
-                    "executive_summary": local_review["executive_summary"],
-                    "likely_causes": local_review["likely_causes"],
-                    "recommendations": local_review["recommendations"],
-                    "confidence": local_review["confidence"],
-                },
+        payload={
+            "evidence": evidence,
+            "local_review": {
+                "executive_summary": local_review["executive_summary"],
+                "likely_causes": local_review["likely_causes"],
+                "recommendations": local_review["recommendations"],
+                "confidence": local_review["confidence"],
             },
-            ensure_ascii=False,
-        ),
-        "text": {"format": _managerial_ai_response_schema(), "verbosity": "low"},
-        "max_output_tokens": 1800,
-        "store": False,
-    }
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
         },
-        method="POST",
+        api_key=api_key,
+        model=model,
+        max_tokens=1800,
     )
 
-    timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "12"))
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        details = exc.read().decode("utf-8", errors="ignore")[:500]
-        raise RuntimeError(f"OpenAI retornou HTTP {exc.code}: {details}") from exc
 
-    output_text = _extract_output_text(payload)
-    if not output_text:
-        raise RuntimeError("Resposta da IA sem texto estruturado.")
-    return json.loads(output_text)
-
-
-def _merge_ai_managerial_review(local_review: dict, ai_payload: dict, model: str, evidence: dict) -> dict:
+def _merge_ai_managerial_review(local_review: dict, ai_payload: dict, model: str, evidence: dict, provider: str = "openrouter") -> dict:
     return {
         **local_review,
         "mode": "ai_managerial_review",
         "ai_enabled": True,
         "ai_status": "completed",
         "model": model,
+        "provider": provider,
         "executive_summary": str(ai_payload.get("executive_summary") or local_review["executive_summary"])[:1200],
         "what_changed": str(ai_payload.get("what_changed") or local_review["what_changed"])[:900],
         "likely_causes": _normalize_causes(ai_payload.get("likely_causes"), local_review["likely_causes"]),

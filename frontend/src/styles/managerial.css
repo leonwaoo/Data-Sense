@@ -523,6 +523,33 @@
   font-size: 0.78rem;
 }
 
+.managerial-ai-actions {
+  align-items: end;
+  display: flex;
+  gap: 10px;
+}
+
+.managerial-model-field {
+  display: grid;
+  gap: 5px;
+  min-width: 220px;
+}
+
+.managerial-model-field input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.82rem;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.managerial-model-field input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .managerial-ai-heading button {
   align-items: center;
   background: var(--accent);
@@ -1093,9 +1120,14 @@
 
 @media (max-width: 760px) {
   .managerial-ai-heading,
+  .managerial-ai-actions,
   .managerial-ai-list article > div {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .managerial-model-field {
+    width: 100%;
   }
 
   .monthly-focus-body {

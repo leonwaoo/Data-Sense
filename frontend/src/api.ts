@@ -40,8 +40,9 @@ export async function askQuestion(datasetId: string, question: string): Promise<
   return (await response.json()) as Answer;
 }
 
-export async function fetchManagerialAiReview(datasetId: string): Promise<ManagerialAiReview> {
-  const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/managerial-analysis/ai`);
+export async function fetchManagerialAiReview(datasetId: string, model?: string): Promise<ManagerialAiReview> {
+  const query = model?.trim() ? `?model=${encodeURIComponent(model.trim())}` : "";
+  const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/managerial-analysis/ai${query}`);
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
     throw new Error(payload?.detail || "Nao foi possivel gerar a leitura gerencial com IA.");

@@ -263,6 +263,7 @@ export type ManagerialAiReview = {
   ai_status: "not_configured" | "disabled" | "failed" | "completed" | string;
   ai_error?: string;
   model: string | null;
+  provider?: string;
   executive_summary: string;
   what_changed: string;
   likely_causes: ManagerialAiCause[];

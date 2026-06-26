@@ -45,6 +45,7 @@ export function App() {
   const [section, setSection] = useState<SectionKey>("overview");
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [managerialAiReview, setManagerialAiReview] = useState<ManagerialAiReview | null>(null);
+  const [managerialAiModel, setManagerialAiModel] = useState("openai/gpt-4o-mini");
   const [dashboardFilters, setDashboardFilters] = useState<DashboardFilters>(defaultDashboardFilters);
   const [dashboardSettings, setDashboardSettings] = useState<DashboardSettings>({
     title: "Dashboard DataSense",
@@ -170,12 +171,12 @@ export function App() {
     }
   }
 
-  async function handleManagerialAiReview() {
+  async function handleManagerialAiReview(model = managerialAiModel) {
     if (!dataset) return;
     setIsManagerialAiLoading(true);
     setError(null);
     try {
-      setManagerialAiReview(await fetchManagerialAiReview(dataset.dataset_id));
+      setManagerialAiReview(await fetchManagerialAiReview(dataset.dataset_id, model));
     } catch (reviewError) {
       setError(reviewError instanceof Error ? reviewError.message : "Erro inesperado na leitura gerencial com IA.");
     } finally {
@@ -269,9 +270,11 @@ export function App() {
           ) : section === "diagnostic" ? (
             <DiagnosticSection
               aiReview={managerialAiReview}
+              aiModel={managerialAiModel}
               analysis={dataset.managerial_analysis}
               isManagerialAiLoading={isManagerialAiLoading}
-              onManagerialAiReview={() => void handleManagerialAiReview()}
+              onManagerialAiModelChange={setManagerialAiModel}
+              onManagerialAiReview={(model) => void handleManagerialAiReview(model)}
             />
           ) : section === "dashboard" ? (
             <DashboardSection

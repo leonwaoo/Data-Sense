@@ -2,8 +2,6 @@ import json
 import math
 import os
 import re
-import urllib.error
-import urllib.request
 from collections.abc import Iterable
 from functools import partial
 from typing import Any
@@ -11,6 +9,13 @@ from typing import Any
 import pandas as pd
 
 from app.models import DatasetSession
+from app.services.ai_provider_service import (
+    DEFAULT_OPENROUTER_MODEL,
+    has_real_api_key as _has_real_api_key,
+    request_openrouter_json,
+    resolve_ai_credentials,
+    safe_ai_error_message as _provider_safe_error_message,
+)
 from app.services.column_heuristics import (
     format_number as _format_number,
     is_metric_noise,
@@ -22,9 +27,7 @@ from app.services.dashboard_service import build_dashboard
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
 
-DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
-PLACEHOLDER_API_KEYS = {"sua_chave_openai", "your_openai_api_key", "cole_sua_chave_aqui"}
+DEFAULT_OPENAI_MODEL = DEFAULT_OPENROUTER_MODEL
 
 METRIC_NOISE_TERMS = {
     "id",
@@ -67,15 +70,16 @@ SEVERITY_PENALTIES = {"critical": 18, "warning": 9, "info": 3}
 _is_metric_noise = partial(is_metric_noise, terms=METRIC_NOISE_TERMS)
 
 
-def build_quality_audit(dataset: DatasetSession) -> dict:
+def build_quality_audit(dataset: DatasetSession, requested_model: str | None = None) -> dict:
     profile = build_profile(dataset)
     quality = build_quality_report(dataset)
     dashboard = build_dashboard(dataset)
     evidence = _build_evidence(dataset, profile, quality, dashboard)
     rule_audit = _build_rule_audit(evidence)
 
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    model = os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL
+    credentials = resolve_ai_credentials(requested_model)
+    api_key = credentials["api_key"]
+    model = credentials["model"]
     if not _has_real_api_key(api_key):
         return {
             **rule_audit,
@@ -103,10 +107,6 @@ def build_quality_audit(dataset: DatasetSession) -> dict:
             "ai_error": _safe_error_message(exc),
             "model": model,
         }
-
-
-def _has_real_api_key(api_key: str) -> bool:
-    return bool(api_key and api_key.lower() not in PLACEHOLDER_API_KEYS)
 
 
 def _build_evidence(dataset: DatasetSession, profile: dict, quality: dict, dashboard: dict) -> dict:
@@ -489,53 +489,26 @@ def _check_ingest_warnings(evidence: dict, findings: list[dict]) -> None:
         )
     )
 def _request_ai_audit(evidence: dict, rule_audit: dict, api_key: str, model: str) -> dict:
-    url = os.getenv("OPENAI_RESPONSES_URL", OPENAI_RESPONSES_URL).strip() or OPENAI_RESPONSES_URL
-    body = {
-        "model": model,
-        "instructions": (
+    return request_openrouter_json(
+        system_prompt=(
             "Voce e um auditor de qualidade de dados do DataSense. "
             "Revise se a analise automatica e confiavel antes de o usuario tomar decisoes. "
             "Use apenas as evidencias fornecidas. Foque em cabecalho, tipos, datas, metricas, totais negativos, "
             "nulos, duplicatas, outliers e graficos possivelmente montados com coluna errada. "
-            "Responda em portugues do Brasil, com recomendacoes curtas e acionaveis."
+            "Responda em portugues do Brasil, com recomendacoes curtas e acionaveis. "
+            "O JSON deve conter: summary, analysis_score, findings e recommendations."
         ),
-        "input": json.dumps(
-            {
-                "evidence": evidence,
-                "rule_audit": {
-                    "analysis_score": rule_audit["analysis_score"],
-                    "findings": rule_audit["findings"],
-                },
+        payload={
+            "evidence": evidence,
+            "rule_audit": {
+                "analysis_score": rule_audit["analysis_score"],
+                "findings": rule_audit["findings"],
             },
-            ensure_ascii=False,
-        ),
-        "text": {"format": _ai_response_schema(), "verbosity": "low"},
-        "max_output_tokens": 1800,
-        "store": False,
-    }
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
         },
-        method="POST",
+        api_key=api_key,
+        model=model,
+        max_tokens=1800,
     )
-
-    timeout = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "12"))
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        details = exc.read().decode("utf-8", errors="ignore")[:500]
-        raise RuntimeError(f"OpenAI retornou HTTP {exc.code}: {details}") from exc
-
-    output_text = _extract_output_text(payload)
-    if not output_text:
-        raise RuntimeError("Resposta da IA sem texto estruturado.")
-
-    return json.loads(output_text)
 
 
 def _merge_ai_audit(rule_audit: dict, ai_payload: dict, model: str) -> dict:
@@ -841,8 +814,7 @@ def _ai_audit_disabled() -> bool:
 
 
 def _safe_error_message(exc: Exception) -> str:
-    message = str(exc).replace(os.getenv("OPENAI_API_KEY", ""), "[redacted]")
-    return message[:500] or "Falha ao chamar a IA."
+    return _provider_safe_error_message(exc)
 
 
 def _clamp_int(value: Any, minimum: int, maximum: int, fallback: int) -> int:

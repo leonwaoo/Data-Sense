@@ -48,8 +48,9 @@ O sistema atuara como um assistente para analise de dados:
 - Recalcula o dashboard com filtros de periodo e categorias, como produto, fornecedor, cliente, categoria, regiao ou canal.
 - Detecta anomalias e problemas de qualidade.
 - Gera uma auditoria inteligente da confiabilidade da analise, apontando cabecalho suspeito, datas como texto, metricas inadequadas, totais negativos, nulos, duplicatas e outliers.
-- Pode usar IA para revisar a auditoria quando `OPENAI_API_KEY` estiver configurada; sem chave, usa regras locais.
+- Pode usar IA pelo OpenRouter para revisar a auditoria quando `OPENROUTER_API_KEY` estiver configurada; sem chave, usa regras locais.
 - Pode usar IA para uma segunda leitura gerencial em `/datasets/{id}/managerial-analysis/ai`, recebendo somente evidencias calculadas, como variacoes, causa raiz, alertas, drivers e limitacoes.
+- Permite escolher o modelo do OpenRouter na chamada da IA, por exemplo `?model=anthropic/claude-3.5-sonnet`.
 - Sugere proximas analises e recomendacoes de negocio.
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
 - Renderiza graficos reais no relatorio, com mensagem clara quando nao ha dados suficientes para desenhar uma visualizacao.
@@ -111,14 +112,16 @@ copy .env.example .env
 Depois edite `backend/.env` e preencha:
 
 ```bash
-OPENAI_API_KEY=sua_chave_openai
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_SECONDS=12
+OPENROUTER_API_KEY=sua_chave_openrouter
+OPENROUTER_MODEL=openai/gpt-4o-mini
+OPENROUTER_TIMEOUT_SECONDS=12
+OPENROUTER_SITE_URL=https://data-sense-three.vercel.app
+OPENROUTER_APP_TITLE=DataSense
 DATASENSE_MANAGERIAL_AI_ENABLED=true
 ```
 
-A chave deve ficar somente no backend. Nunca coloque `OPENAI_API_KEY` no frontend ou na Vercel do frontend.
-Se `OPENAI_API_KEY` nao existir, as rotas de auditoria e analise gerencial com IA usam somente regras locais e seguem funcionando normalmente.
+A chave deve ficar somente no backend. Nunca coloque `OPENROUTER_API_KEY` no frontend ou na Vercel do frontend.
+Se `OPENROUTER_API_KEY` nao existir, as rotas de auditoria e analise gerencial com IA usam somente regras locais e seguem funcionando normalmente.
 
 ### Frontend
 
@@ -165,9 +168,11 @@ O arquivo `render.yaml` define a API como um Web Service Python:
 
 Para ativar IA em producao, configure no Render, dentro do Web Service da API:
 
-- `OPENAI_API_KEY`: chave da OpenAI.
-- `OPENAI_MODEL`: `gpt-4o-mini`.
-- `OPENAI_TIMEOUT_SECONDS`: `12`.
+- `OPENROUTER_API_KEY`: chave do OpenRouter.
+- `OPENROUTER_MODEL`: modelo padrao, por exemplo `openai/gpt-4o-mini`.
+- `OPENROUTER_TIMEOUT_SECONDS`: `12`.
+- `OPENROUTER_SITE_URL`: URL publica do frontend.
+- `OPENROUTER_APP_TITLE`: `DataSense`.
 - `DATASENSE_MANAGERIAL_AI_ENABLED`: `true` para ativar a segunda leitura gerencial por IA.
 
 ### Frontend na Vercel

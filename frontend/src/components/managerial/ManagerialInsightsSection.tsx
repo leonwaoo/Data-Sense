@@ -5,14 +5,18 @@ import type { ManagerialAiReview, ManagerialAnalysis } from "../../types";
 type ManagerialInsightsSectionProps = {
   analysis: ManagerialAnalysis;
   aiReview: ManagerialAiReview | null;
+  aiModel: string;
   isAiLoading: boolean;
-  onAiReview: () => void;
+  onAiModelChange: (model: string) => void;
+  onAiReview: (model?: string) => void;
 };
 
 export function ManagerialInsightsSection({
   analysis,
   aiReview,
+  aiModel,
   isAiLoading,
+  onAiModelChange,
   onAiReview,
 }: ManagerialInsightsSectionProps) {
   const rootCause = analysis.root_cause_analysis ?? null;
@@ -57,10 +61,28 @@ export function ManagerialInsightsSection({
               <span>{aiStatusLabel}</span>
             </div>
           </div>
-          <button disabled={isAiLoading} onClick={onAiReview} type="button">
-            <Sparkles size={15} />
-            {isAiLoading ? "Analisando..." : aiReview ? "Atualizar leitura" : "Gerar leitura"}
-          </button>
+          <div className="managerial-ai-actions">
+            <label className="managerial-model-field">
+              <span>Modelo OpenRouter</span>
+              <input
+                list="managerial-ai-models"
+                placeholder="openai/gpt-4o-mini"
+                value={aiModel}
+                onChange={(event) => onAiModelChange(event.target.value)}
+              />
+            </label>
+            <datalist id="managerial-ai-models">
+              <option value="openai/gpt-4o-mini" />
+              <option value="openai/gpt-4o" />
+              <option value="anthropic/claude-3.5-sonnet" />
+              <option value="google/gemini-2.0-flash-001" />
+              <option value="meta-llama/llama-3.1-70b-instruct" />
+            </datalist>
+            <button disabled={isAiLoading} onClick={() => onAiReview(aiModel)} type="button">
+              <Sparkles size={15} />
+              {isAiLoading ? "Analisando..." : aiReview ? "Atualizar leitura" : "Gerar leitura"}
+            </button>
+          </div>
         </div>
 
         {aiReview ? (

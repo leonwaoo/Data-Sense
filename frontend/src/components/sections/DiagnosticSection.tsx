@@ -5,14 +5,18 @@ import type { ManagerialAiReview, ManagerialAnalysis } from "../../types";
 type DiagnosticSectionProps = {
   analysis: ManagerialAnalysis | null | undefined;
   aiReview: ManagerialAiReview | null;
+  aiModel: string;
   isManagerialAiLoading: boolean;
-  onManagerialAiReview: () => void;
+  onManagerialAiModelChange: (model: string) => void;
+  onManagerialAiReview: (model?: string) => void;
 };
 
 export function DiagnosticSection({
   analysis,
   aiReview,
+  aiModel,
   isManagerialAiLoading,
+  onManagerialAiModelChange,
   onManagerialAiReview,
 }: DiagnosticSectionProps) {
   if (!analysis) {
@@ -37,8 +41,10 @@ export function DiagnosticSection({
       </section>
       <ManagerialInsightsSection
         aiReview={aiReview}
+        aiModel={aiModel}
         analysis={analysis}
         isAiLoading={isManagerialAiLoading}
+        onAiModelChange={onManagerialAiModelChange}
         onAiReview={onManagerialAiReview}
       />
     </div>

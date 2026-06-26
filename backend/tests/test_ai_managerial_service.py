@@ -22,6 +22,7 @@ def _inventory_dataset() -> DatasetSession:
 
 
 def test_managerial_ai_review_uses_local_review_without_api_key(monkeypatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     review = build_managerial_ai_review(_inventory_dataset())
@@ -36,11 +37,13 @@ def test_managerial_ai_review_uses_local_review_without_api_key(monkeypatch) -> 
 
 
 def test_managerial_ai_review_merges_structured_ai_payload(monkeypatch) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-proj-chave-real-de-teste")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-chave-real-de-teste")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     def fake_request(evidence: dict, local_review: dict, api_key: str, model: str) -> dict:
         assert evidence["root_cause"]["primary_contributor"]["name"] == "Cafe A"
-        assert api_key == "sk-proj-chave-real-de-teste"
+        assert api_key == "sk-or-chave-real-de-teste"
+        assert model == "anthropic/claude-3.5-sonnet"
         return {
             "executive_summary": "Cafe A explica a queda operacional de marco.",
             "what_changed": "Estoque caiu no mes analisado.",
@@ -60,11 +63,12 @@ def test_managerial_ai_review_merges_structured_ai_payload(monkeypatch) -> None:
 
     monkeypatch.setattr(ai_managerial_service, "_request_ai_managerial_review", fake_request)
 
-    review = build_managerial_ai_review(_inventory_dataset())
+    review = build_managerial_ai_review(_inventory_dataset(), requested_model="anthropic/claude-3.5-sonnet")
 
     assert review["ai_enabled"] is True
     assert review["ai_status"] == "completed"
-    assert review["model"] == "gpt-4o-mini"
+    assert review["model"] == "anthropic/claude-3.5-sonnet"
+    assert review["provider"] == "openrouter"
     assert review["mode"] == "ai_managerial_review"
     assert review["executive_summary"] == "Cafe A explica a queda operacional de marco."
     assert review["likely_causes"][0]["title"] == "Consumo operacional elevado"

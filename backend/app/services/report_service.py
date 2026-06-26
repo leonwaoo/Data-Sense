@@ -20,6 +20,7 @@ from app.services.dashboard_service import build_dashboard
 from app.services.chart_service import suggest_charts
 from app.services.column_heuristics import format_number
 from app.services.date_utils import parse_common_dates
+from app.services.managerial_context_service import looks_like_month_without_year
 from app.services.managerial_analysis_service import build_managerial_analysis
 from app.services.profile_service import build_profile
 from app.services.quality_service import build_quality_report
@@ -437,18 +438,6 @@ def _quality_score_sentence(score: int) -> str:
 
 def _build_report_charts(dataset: DatasetSession, profile: dict) -> list[ReportChart]:
     charts: list[ReportChart] = []
-    missing = profile["missing_values"]
-    if missing:
-        top_missing = sorted(missing.items(), key=lambda item: item[1], reverse=True)[:6]
-        charts.append(
-            ReportChart(
-                title="Valores ausentes por coluna",
-                chart_type="bar",
-                labels=[str(column) for column, _ in top_missing],
-                values=[float(value) for _, value in top_missing],
-                note="Ajuda a priorizar limpeza e validacao dos campos.",
-            )
-        )
 
     for chart_payload in build_dashboard(dataset).get("charts", []):
         if chart_payload.get("id") in {"nulos_por_coluna", "score_qualidade"}:
@@ -511,6 +500,8 @@ def _chart_from_suggestion(dataset: DatasetSession, suggestion: dict) -> ReportC
 
     if suggestion["type"] == "line":
         dates = parse_common_dates(df[x_column])
+        if looks_like_month_without_year(x_column, dates):
+            return None
         values = pd.to_numeric(df[y_column], errors="coerce")
         result = (
             pd.DataFrame({"periodo": dates.dt.to_period("M").astype(str), "valor": values})

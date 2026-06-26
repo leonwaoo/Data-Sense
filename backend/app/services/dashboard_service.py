@@ -137,8 +137,6 @@ def _build_kpis(
     date_column: str | None,
 ) -> list[dict]:
     df = dataset.dataframe
-    total_cells = max(df.shape[0] * df.shape[1], 1)
-    missing_rate = quality["missing_total"] / total_cells
     duplicate_rate = quality["duplicate_rows"] / max(df.shape[0], 1)
 
     kpis = [
@@ -153,12 +151,6 @@ def _build_kpis(
             "value": f"{quality['score']}/100",
             "detail": _quality_label(quality["score"]),
             "tone": "good" if quality["score"] >= 85 else "warning" if quality["score"] >= 65 else "danger",
-        },
-        {
-            "label": "Valores nulos",
-            "value": _format_number(quality["missing_total"]),
-            "detail": f"{missing_rate:.1%} das celulas",
-            "tone": "good" if quality["missing_total"] == 0 else "warning",
         },
         {
             "label": "Duplicatas",
@@ -225,10 +217,6 @@ def _build_charts(
                 charts.append(margin_ranking["chart"])
                 insights.append(margin_ranking["insight"])
                 break
-
-    missing_chart = _missing_chart(dataset, quality)
-    if missing_chart:
-        charts.append(missing_chart)
 
     charts.append(_quality_chart(dataset, quality))
     return charts[:5], insights

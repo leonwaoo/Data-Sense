@@ -128,6 +128,32 @@ def _rich_sales_dataset() -> DatasetSession:
     return DatasetSession(dataset_id="teste-vendas-rico", file_name="vendas_rico.xlsx", dataframe=dataframe)
 
 
+def _fiscal_year_sales_dataset() -> DatasetSession:
+    dataframe = pd.DataFrame(
+        {
+            "FY GAAP": ["FY24", "FY24", "FY24", "FY24", "FY25", "FY25"],
+            "Month": ["OUT", "NOV", "DEZ", "DEZ", "JAN", "FEV"],
+            "Cliente": ["A", "A", "A", "B", "A", "B"],
+            "Canal": ["E-commerce", "E-commerce", "Loja", "Loja", "E-commerce", "Loja"],
+            "Produto": ["Cafe", "Cafe", "Cafe", "Cafe Especial", "Cafe", "Cafe Especial"],
+            "Receita Bruta (R$)": [100, 120, 200, 80, 180, 190],
+            "Margem EBITDA": [0.2, 0.21, 0.24, 0.35, 0.22, 0.36],
+        }
+    )
+    return DatasetSession(dataset_id="teste-vendas-fiscal", file_name="vendas_fiscal.xlsx", dataframe=dataframe)
+
+
+def _month_only_sales_dataset() -> DatasetSession:
+    dataframe = pd.DataFrame(
+        {
+            "Month": ["JAN", "FEV", "MAR"],
+            "Produto": ["Cafe", "Cafe", "Cafe"],
+            "Receita": [100, 120, 140],
+        }
+    )
+    return DatasetSession(dataset_id="teste-vendas-mes", file_name="vendas_mes.xlsx", dataframe=dataframe)
+
+
 def _purchase_supplier_item_dataset() -> DatasetSession:
     dataframe = pd.DataFrame(
         {
@@ -177,6 +203,25 @@ def test_build_time_context_uses_year_plus_month_fallback() -> None:
     assert time_context["label"] == "Ano + Month"
     assert time_context["columns"] == ["Ano", "Month"]
     assert time_context["series"].dt.strftime("%Y-%m").tolist() == ["2024-01", "2024-02", "2024-03", "2024-04"]
+
+
+def test_build_time_context_uses_fiscal_year_plus_month() -> None:
+    dataset = _fiscal_year_sales_dataset()
+    profile = build_profile(dataset)
+
+    time_context = _build_time_context(dataset.dataframe, profile)
+
+    assert time_context["available"] is True
+    assert time_context["label"] == "FY GAAP + Month"
+    assert time_context["columns"] == ["FY GAAP", "Month"]
+    assert time_context["series"].dt.strftime("%Y-%m").tolist() == [
+        "2024-10",
+        "2024-11",
+        "2024-12",
+        "2024-12",
+        "2025-01",
+        "2025-02",
+    ]
 
 
 def test_managerial_analysis_ranks_dimension_contributors_and_concentration_alerts() -> None:
@@ -261,6 +306,27 @@ def test_dashboard_uses_year_month_context_and_margin_ranking() -> None:
     assert periods == ["2024-09", "2024-10", "2024-11", "2024-12"]
     assert not any(str(period).startswith("2000-") for period in periods)
     assert margin["data"][0]["grupo"] == "Cafe Organico"
+
+
+def test_dashboard_uses_fiscal_year_and_hides_null_chart() -> None:
+    dashboard = build_dashboard(_fiscal_year_sales_dataset())
+    monthly = next(chart for chart in dashboard["charts"] if chart["id"] == "evolucao_mensal")
+
+    periods = [row["periodo"] for row in monthly["data"]]
+    chart_ids = {chart["id"] for chart in dashboard["charts"]}
+    kpi_labels = {kpi["label"] for kpi in dashboard["kpis"]}
+
+    assert periods == ["2024-10", "2024-11", "2024-12", "2025-01", "2025-02"]
+    assert not any(str(period).startswith("2000-") for period in periods)
+    assert "nulos_por_coluna" not in chart_ids
+    assert "Valores nulos" not in kpi_labels
+
+
+def test_dashboard_does_not_publish_synthetic_2000_for_month_only_column() -> None:
+    dashboard = build_dashboard(_month_only_sales_dataset())
+
+    assert "2000-" not in str(dashboard["charts"])
+    assert "2000-" not in str(dashboard["insights"])
 
 
 def test_managerial_analysis_uses_supplier_and_item_for_purchases() -> None:

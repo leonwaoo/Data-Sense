@@ -68,7 +68,7 @@ DOMAIN_RULES = [
     },
 ]
 
-YEAR_TERMS = ["ano", "year", "exercicio"]
+YEAR_TERMS = ["ano", "year", "exercicio", "fiscal", "fy", "gaap"]
 MONTH_TERMS = ["mes", "month", "competencia"]
 
 
@@ -130,6 +130,8 @@ def map_metrics(df: pd.DataFrame, profile: dict, domain: dict) -> dict:
 def build_time_context(df: pd.DataFrame, profile: dict) -> dict:
     year_column = first_matching(profile["column_names"], YEAR_TERMS)
     month_column = first_matching([column for column in profile["column_names"] if column != year_column], MONTH_TERMS)
+    if month_column and not year_column:
+        year_column = infer_year_column(df, profile["column_names"], exclude={month_column})
     if year_column and month_column:
         parsed = parse_year_month(df[year_column], df[month_column])
         if parsed.notna().mean() >= 0.6:
@@ -142,26 +144,73 @@ def build_time_context(df: pd.DataFrame, profile: dict) -> dict:
 
     for column in profile["datetime_columns"]:
         parsed = parse_common_dates(df[column])
-        if parsed.notna().mean() >= 0.6:
+        if parsed.notna().mean() >= 0.6 and not looks_like_month_without_year(column, parsed):
             return {"available": True, "label": column, "columns": [column], "series": parsed}
 
     for candidate in profile.get("date_candidates", []):
         column = candidate.get("column")
         if column in df.columns:
             parsed = parse_common_dates(df[column])
-            if parsed.notna().mean() >= 0.6:
+            if parsed.notna().mean() >= 0.6 and not looks_like_month_without_year(column, parsed):
                 return {"available": True, "label": column, "columns": [column], "series": parsed}
 
     return {"available": False, "label": None, "columns": [], "series": pd.Series(pd.NaT, index=df.index)}
 
 
 def parse_year_month(year_series: pd.Series, month_series: pd.Series) -> pd.Series:
-    years = pd.to_numeric(year_series, errors="coerce")
+    years = year_series.map(year_number)
     months = month_series.map(month_number)
     return pd.to_datetime(
         pd.DataFrame({"year": years, "month": months, "day": 1}),
         errors="coerce",
     )
+
+
+def infer_year_column(df: pd.DataFrame, columns: list[str], exclude: set[str] | None = None) -> str | None:
+    exclude = exclude or set()
+    scored: list[tuple[float, int, str]] = []
+    for column in columns:
+        if column in exclude or column not in df.columns:
+            continue
+        years = df[column].map(year_number)
+        ratio = float(years.notna().mean()) if len(years) else 0.0
+        if ratio < 0.6:
+            continue
+        name_bonus = 1 if any(term in _normalize_text(column) for term in YEAR_TERMS) else 0
+        scored.append((ratio, name_bonus, column))
+
+    scored.sort(reverse=True)
+    return scored[0][2] if scored else None
+
+
+def year_number(value: Any) -> float | None:
+    if pd.isna(value):
+        return None
+
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if 1900 <= int(value) <= 2200:
+            return int(value)
+
+    text = _strip_accents(str(value)).lower().strip()
+    match = re.search(r"(19|20|21|22)\d{2}", text)
+    if match:
+        return int(match.group(0))
+
+    fiscal_match = re.search(r"(?:fy|exercicio|ano)?\s*'?(\d{2})\b", text)
+    if fiscal_match and any(term in text for term in ["fy", "fiscal", "gaap"]):
+        year = int(fiscal_match.group(1))
+        return 2000 + year if year < 70 else 1900 + year
+
+    return None
+
+
+def looks_like_month_without_year(column: str, parsed: pd.Series) -> bool:
+    normalized = _normalize_text(column)
+    if not any(term in normalized for term in MONTH_TERMS):
+        return False
+
+    years = parsed.dropna().dt.year
+    return not years.empty and years.nunique() == 1 and int(years.iloc[0]) == 2000
 
 
 def month_number(value: Any) -> float | None:

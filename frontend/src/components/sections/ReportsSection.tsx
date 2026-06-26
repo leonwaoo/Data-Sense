@@ -29,7 +29,7 @@ export function ReportsSection({
         <div>
           <Download size={18} />
           <strong>Exportacao executiva unificada</strong>
-          <span>Resumo executivo, principais mudancas, causa raiz, leituras por dimensao e Power BI - {dataset.file_name}</span>
+          <span>Resumo executivo, principais mudancas, causa raiz e leituras por dimensao - {dataset.file_name}</span>
         </div>
         <div className="report-actions">
           <button disabled={!!exportingFormat} onClick={() => onDownloadReport("pdf")} type="button">

@@ -47,7 +47,7 @@ DOMAIN_RULES = [
             "quantidade": ["quantidade", "qtd", "volume", "unidade"],
             "prazo": ["prazo", "lead_time", "dias"],
         },
-        "dimensions": ["fornecedor", "produto", "categoria", "comprador", "status"],
+        "dimensions": ["fornecedor", "item", "produto", "categoria", "comprador", "status"],
     },
     {
         "type": "financeiro",

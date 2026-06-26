@@ -103,12 +103,12 @@ export function DashboardSection({
           <h2>Dashboard automatico</h2>
           <span>Gerando visualizacoes</span>
         </div>
-        <EmptyState text="Montando KPIs, rankings, evolucao e qualidade do dataset." />
+        <EmptyState text="Montando graficos e leituras do arquivo." />
       </section>
     );
   }
 
-  if (!dashboard) return <EmptyState text="Envie um dataset para gerar o dashboard automatico." />;
+  if (!dashboard) return <EmptyState text="Envie um arquivo para gerar os graficos automaticos." />;
 
   return (
     <section

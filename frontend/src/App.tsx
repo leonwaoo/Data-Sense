@@ -35,7 +35,7 @@ const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
   overview: { title: "Inicio", subtitle: "Leitura simples para entender o que merece atencao" },
   diagnostic: { title: "Diagnostico gerencial", subtitle: "Causa raiz, impacto e acoes recomendadas" },
   dashboard: { title: "Graficos", subtitle: "Visualizacoes simples para explorar o arquivo" },
-  details: { title: "Detalhes", subtitle: "Metricas, qualidade e estrutura tecnica do dataset" },
+  details: { title: "Detalhes", subtitle: "Indicadores, qualidade e estrutura tecnica do arquivo" },
   chat: { title: "Chat analitico", subtitle: "Pergunte aos dados em linguagem natural" },
   reports: { title: "Relatorios", subtitle: "Exportacoes, arquivos de teste e historico" },
 };

@@ -81,6 +81,38 @@ def _cost_up_volume_down_dataset() -> DatasetSession:
     return DatasetSession(dataset_id="teste-custo-volume", file_name="estoque_alerta.xlsx", dataframe=dataframe)
 
 
+def _sales_client_channel_dataset() -> DatasetSession:
+    dataframe = pd.DataFrame(
+        {
+            "Ano": [2025, 2025, 2025, 2025, 2025, 2025],
+            "Month": ["JAN", "JAN", "FEV", "FEV", "MAR", "MAR"],
+            "Cliente": ["Cliente A", "Cliente B", "Cliente A", "Cliente B", "Cliente A", "Cliente B"],
+            "Canal": ["Online", "Loja", "Online", "Loja", "Online", "Loja"],
+            "Produto": ["Produto X", "Produto Y", "Produto X", "Produto Y", "Produto X", "Produto Y"],
+            "Receita": [1000, 600, 1250, 610, 400, 620],
+            "Quantidade": [10, 6, 12, 6, 4, 6],
+            "Desconto": [20, 15, 25, 15, 80, 15],
+        }
+    )
+    return DatasetSession(dataset_id="teste-vendas", file_name="vendas.xlsx", dataframe=dataframe)
+
+
+def _purchase_supplier_item_dataset() -> DatasetSession:
+    dataframe = pd.DataFrame(
+        {
+            "Ano": [2025, 2025, 2025, 2025, 2025, 2025],
+            "Month": ["JAN", "JAN", "FEV", "FEV", "MAR", "MAR"],
+            "Fornecedor": ["Fornecedor A", "Fornecedor B", "Fornecedor A", "Fornecedor B", "Fornecedor A", "Fornecedor B"],
+            "Item": ["Insumo X", "Insumo Y", "Insumo X", "Insumo Y", "Insumo X", "Insumo Y"],
+            "Comprador": ["Time 1", "Time 2", "Time 1", "Time 2", "Time 1", "Time 2"],
+            "Valor Compra": [700, 500, 720, 520, 1500, 530],
+            "Quantidade": [7, 5, 7, 5, 14, 5],
+            "Prazo Dias": [12, 15, 13, 15, 25, 15],
+        }
+    )
+    return DatasetSession(dataset_id="teste-compras", file_name="compras.xlsx", dataframe=dataframe)
+
+
 def test_detect_analysis_domain_recognizes_inventory_operations() -> None:
     dataset = _inventory_dataset()
     profile = build_profile(dataset)
@@ -160,3 +192,29 @@ def test_managerial_analysis_emits_critical_drop_and_cost_vs_volume_alerts() -> 
 
     assert any("Queda superior a 50%" in alert for alert in alerts)
     assert any("Custo subiu enquanto volume caiu" in alert for alert in alerts)
+
+
+def test_managerial_analysis_uses_client_and_channel_for_sales() -> None:
+    analysis = build_managerial_analysis(_sales_client_channel_dataset())
+
+    assert analysis["context"]["domain"]["type"] == "vendas"
+    labels = {item["label"] for item in analysis["root_cause_analysis"]["dimension_drivers"]}
+    ranking_labels = {item["label"] for item in analysis["root_cause_analysis"]["dimension_impact_ranking"]}
+
+    assert "Cliente" in labels
+    assert "Canal" in labels
+    assert "Cliente" in ranking_labels
+    assert analysis["dimension_narratives"]
+
+
+def test_managerial_analysis_uses_supplier_and_item_for_purchases() -> None:
+    analysis = build_managerial_analysis(_purchase_supplier_item_dataset())
+
+    assert analysis["context"]["domain"]["type"] == "compras"
+    labels = {item["label"] for item in analysis["root_cause_analysis"]["dimension_drivers"]}
+    ranking_labels = {item["label"] for item in analysis["root_cause_analysis"]["dimension_impact_ranking"]}
+
+    assert "Fornecedor" in labels
+    assert "Item" in labels
+    assert "Fornecedor" in ranking_labels
+    assert analysis["dimension_narratives"]

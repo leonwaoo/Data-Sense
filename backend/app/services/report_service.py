@@ -258,15 +258,15 @@ def _technical_detail_items(context: ReportContext) -> list[str]:
     items = [
         f"Arquivo: {context.file_name}.",
         f"Estrutura: {profile['rows']} linhas e {profile['columns']} colunas.",
-        f"Qualidade: score {quality.get('score')}/100, {quality.get('missing_total')} nulos e {quality.get('duplicate_rows')} duplicatas.",
+        f"Qualidade: pontuacao {quality.get('score')}/100, {quality.get('missing_total')} nulos e {quality.get('duplicate_rows')} duplicatas.",
     ]
     if metric_map.get("primary_metric"):
-        items.append(f"Metrica principal usada pelo motor: {metric_map.get('primary_metric')}.")
+        items.append(f"Indicador principal usado pelo motor: {metric_map.get('primary_metric')}.")
     if time_payload.get("label"):
         items.append(f"Periodo usado pelo motor: {time_payload.get('label')}.")
     if metric_map.get("support_metrics"):
         support = ", ".join(str(value) for value in metric_map["support_metrics"].values())
-        items.append(f"Metricas de apoio: {support}.")
+        items.append(f"Fatores de apoio: {support}.")
     return items
 
 
@@ -292,7 +292,7 @@ def _managerial_monthly_items(context: ReportContext) -> list[str]:
     items = []
     for item in comparisons[-8:]:
         driver = item.get("main_driver") or {}
-        driver_text = f" Apoio com maior mudanca: {driver.get('column')} {_format_signed_number(driver.get('variation'))}." if driver else ""
+        driver_text = f" Fator de apoio observado: {driver.get('column')}." if driver else ""
         items.append(
             f"{_period_label(item.get('period'))}: {item.get('status', 'sem status')}; "
             f"valor {_format_number(item.get('value'))}; "
@@ -374,7 +374,7 @@ def _quality_items(context: ReportContext) -> list[str]:
     empty_columns = quality["empty_columns"]
     outliers = quality.get("numeric_outliers", {})
     items = [
-        f"Score de qualidade: {quality['score']}/100.",
+        f"Pontuacao de qualidade: {quality['score']}/100.",
         f"Valores ausentes: {quality['missing_total']}.",
         f"Linhas duplicadas: {quality['duplicate_rows']}.",
         f"Colunas vazias: {len(empty_columns)}.",
@@ -432,7 +432,7 @@ def _quality_score_sentence(score: int) -> str:
         return "A qualidade geral esta alta, com poucos pontos de atencao."
     if score >= 70:
         return "A qualidade geral esta boa, mas ha ajustes importantes antes de decisoes finais."
-    return "A qualidade geral exige revisao antes de usar o dataset para decisoes."
+    return "A qualidade geral exige revisao antes de usar o arquivo para decisoes."
 
 
 def _build_report_charts(dataset: DatasetSession, profile: dict) -> list[ReportChart]:
@@ -723,7 +723,7 @@ def _png_kpi_cards(draw: ImageDraw.ImageDraw, context: ReportContext, fonts: dic
 
 
 def _report_kpi_cards(context: ReportContext) -> list[tuple[str, str]]:
-    technical_labels = {"Registros", "Score de qualidade", "Valores nulos", "Duplicatas"}
+    technical_labels = {"Registros", "Pontuacao de qualidade", "Valores nulos", "Duplicatas"}
     dashboard_cards = [
         (str(kpi.get("label", "")), str(kpi.get("value", "")))
         for kpi in context.dashboard_kpis

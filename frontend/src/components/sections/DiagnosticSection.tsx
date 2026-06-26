@@ -22,7 +22,7 @@ export function DiagnosticSection({
           <BrainCircuit size={20} />
           <strong>Diagnostico gerencial indisponivel</strong>
         </div>
-        <p>Envie um dataset com metrica e tempo para liberar causa raiz, comparativos e leitura executiva.</p>
+        <p>Envie um arquivo com indicador e periodo para liberar causa raiz, comparativos e leitura executiva.</p>
       </section>
     );
   }
@@ -32,7 +32,7 @@ export function DiagnosticSection({
       <section className="panel diagnostic-strip">
         <div>
           <strong>Diagnostico gerencial</strong>
-          <span>Resumo executivo, causa raiz, leituras por dimensao, alertas e recomendacoes</span>
+          <span>Resumo executivo, causa raiz, leituras por recorte, alertas e recomendacoes</span>
         </div>
       </section>
       <ManagerialInsightsSection

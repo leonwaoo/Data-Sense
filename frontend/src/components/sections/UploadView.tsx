@@ -31,7 +31,7 @@ export function UploadView({
         <h1>Transforme planilhas em respostas, graficos e alertas de qualidade.</h1>
         <p>
           Envie CSV, Excel, TSV, TXT ou JSON tabular e acompanhe a evolucao mes a mes com leituras gerenciais
-          calculadas diretamente no seu dataset.
+          calculadas diretamente no seu arquivo.
         </p>
       </div>
 

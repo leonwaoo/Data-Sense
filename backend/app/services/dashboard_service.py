@@ -141,11 +141,11 @@ def _build_kpis(
         {
             "label": "Registros",
             "value": _format_number(df.shape[0]),
-            "detail": f"{df.shape[1]} colunas no dataset",
+            "detail": f"{df.shape[1]} colunas no arquivo",
             "tone": "neutral",
         },
         {
-            "label": "Score de qualidade",
+            "label": "Pontuacao",
             "value": f"{quality['score']}/100",
             "detail": _quality_label(quality["score"]),
             "tone": "good" if quality["score"] >= 85 else "warning" if quality["score"] >= 65 else "danger",
@@ -333,8 +333,8 @@ def _quality_chart(dataset: DatasetSession, quality: dict) -> dict:
 
     return {
         "id": "score_qualidade",
-        "title": "Score de qualidade",
-        "subtitle": "Score, nulos, duplicatas e outliers em pontos percentuais",
+        "title": "Pontuacao de qualidade",
+        "subtitle": "Qualidade, nulos, duplicatas e outliers em pontos percentuais",
         "type": "bar",
         "x": "indicador",
         "y": "valor",
@@ -356,7 +356,7 @@ def _quality_insights(quality: dict) -> list[str]:
     if quality["duplicate_rows"]:
         insights.append(f"Risco: existem {_format_number(quality['duplicate_rows'])} linhas duplicadas.")
     if quality["score"] < 75:
-        insights.append("Risco: o score de qualidade recomenda validar a base antes de tomar decisoes.")
+        insights.append("Risco: a pontuacao de qualidade recomenda validar a base antes de tomar decisoes.")
     outlier_details = quality.get("numeric_outlier_details", [])
     if outlier_details:
         first = outlier_details[0]
@@ -594,7 +594,7 @@ def _dashboard_subtitle(
 ) -> str:
     parts = [domain["label"]]
     if main_metric:
-        parts.append(f"metrica principal: {_display_label(main_metric, 36)}")
+        parts.append(f"indicador principal: {_display_label(main_metric, 36)}")
     if date_column:
         parts.append(f"tempo: {_display_label(date_column, 36)}")
     if dimensions:

@@ -306,7 +306,7 @@ def _root_dimension_drivers(
                 "previous_value": previous.reindex(index).fillna(0).to_numpy(),
             }
         )
-        if comparison.empty:
+        if comparison.empty or comparison["name"].nunique() < 2:
             continue
 
         comparison["variation"] = comparison["current_value"] - comparison["previous_value"]
@@ -315,6 +315,8 @@ def _root_dimension_drivers(
             axis=1,
         )
         abs_total = comparison["variation"].abs().sum()
+        if not abs_total:
+            continue
         comparison["share_of_abs_change"] = comparison["variation"].abs() / abs_total if abs_total else 0
         comparison["share_of_total_change"] = comparison["variation"] / total_variation if total_variation else None
         history = _dimension_history(prepared, column)
@@ -909,33 +911,30 @@ def _monthly_reading(
         return "Mes base para comparacoes posteriores."
 
     direction = "alta" if variation >= 0 else "queda"
-    driver_text = f" Variavel de apoio com maior mudanca: {main_driver['reading']}" if main_driver else ""
+    driver_text = f" Fator de apoio observado: {main_driver['reading']}" if main_driver else ""
     if domain_type == "estoque_operacao":
         if direction == "queda":
             return (
-                f"{status}: estoque em queda de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
-                "avaliar consumo, saidas, transferencias e reposicao."
+                f"{status}: estoque caiu neste mes; avaliar consumo, saidas, transferencias e reposicao."
                 f"{driver_text}"
             )
         return (
-            f"{status}: estoque em alta de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
-            "avaliar entradas, producao, menor consumo e risco de capital parado."
+            f"{status}: estoque subiu neste mes; avaliar entradas, producao, menor consumo e risco de capital parado."
             f"{driver_text}"
         )
     if domain_type == "vendas":
         return (
-            f"{status}: receita/valor em {direction} de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
-            "validar mix, cliente, produto e campanha do mes."
+            f"{status}: vendas em {direction} neste mes; validar mix, cliente, produto e campanha."
             f"{driver_text}"
         )
     if domain_type == "compras":
         return (
-            f"{status}: compras/custos em {direction} de {_format_signed_number(variation)} ({_format_pct(variation_pct)}), "
+            f"{status}: compras ou custos em {direction} neste mes; "
             "validar pedidos, fornecedor e abastecimento."
             f"{driver_text}"
         )
     return (
-        f"{status}: metrica em {direction} de {_format_signed_number(variation)} ({_format_pct(variation_pct)})."
+        f"{status}: indicador em {direction} neste mes."
         f"{driver_text}"
     )
 
@@ -955,7 +954,7 @@ def _managerial_insight(
     period_label = str(movement["periodo"])
     previous = float(movement["valor"] - variation)
     driver_lines = [driver["interpretation"] for driver in driver_evidence[:2] if driver.get("interpretation")]
-    where = dimension_evidence.get("where") if dimension_evidence else "Movimento avaliado no total do dataset."
+    where = dimension_evidence.get("where") if dimension_evidence else "Movimento avaliado no total do arquivo."
 
     possible_causes = driver_lines or [_generic_cause(domain["type"], direction)]
     return {
@@ -1060,13 +1059,13 @@ def _dimension_evidence(prepared: pd.DataFrame, primary_metric: str, period: str
 
 
 def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) -> dict:
-    limitations = context["limitations"] or ["Nao ha combinacao suficiente de metrica e tempo para diagnosticar variacao."]
+    limitations = context["limitations"] or ["Ainda falta indicador e periodo suficientes para comparar a evolucao."]
     return {
         "mode": "managerial_deep_dive",
         "title": "Analise gerencial profunda",
         "summary": [
-            "O DataSense identificou a estrutura do arquivo, mas ainda nao ha base suficiente para explicar variacoes no tempo.",
-            "Para uma leitura gerencial completa, envie uma metrica numerica relevante e uma coluna de data, mes, trimestre ou ano + mes.",
+            "O DataSense leu o arquivo, mas ainda nao encontrou base suficiente para explicar mudancas ao longo do tempo.",
+            "Para liberar a leitura gerencial, confirme um indicador numerico e uma coluna de periodo, como data, mes, trimestre ou ano + mes.",
         ],
         "context": context,
         "kpis": [
@@ -1076,16 +1075,16 @@ def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) ->
         "insights": [
             {
                 "id": "analise_insuficiente",
-                "title": "Analise gerencial precisa de metrica e tempo",
+                "title": "Analise gerencial precisa de indicador e periodo",
                 "severity": "warning",
                 "metric": context["metric_map"].get("primary_metric"),
                 "period": None,
-                "what_changed": "Nao foi possivel calcular variacao temporal.",
-                "how_much": "Sem comparacao entre periodos.",
-                "where": "Dataset completo.",
+                "what_changed": "Ainda nao foi possivel comparar periodos.",
+                "how_much": "Sem comparacao mes a mes.",
+                "where": "Arquivo completo.",
                 "possible_causes": limitations,
-                "managerial_impact": "Sem variacao temporal confiavel, o gestor recebe apenas uma leitura descritiva.",
-                "recommendation": "Confirmar qual coluna representa data/periodo e qual coluna representa a metrica principal.",
+                "managerial_impact": "Sem periodo confiavel, a leitura fica limitada a uma descricao do arquivo.",
+                "recommendation": "Confirmar qual coluna representa o periodo e qual coluna representa o indicador principal.",
                 "confidence": "baixa",
                 "evidence": limitations,
             }
@@ -1097,7 +1096,7 @@ def _fallback_analysis(dataset: DatasetSession, profile: dict, context: dict) ->
         "comparative_summary": {"cards": [], "readings": []},
         "driver_evidence": [],
         "alerts": limitations,
-        "recommendations": ["Adicionar ou confirmar coluna de periodo para habilitar diagnostico de alta, queda e tendencia."],
+        "recommendations": ["Adicionar ou confirmar uma coluna de periodo para habilitar comparacao, alta, queda e tendencia."],
         "suggested_questions": _suggested_questions(context["domain"]["type"], context["metric_map"], context["dimensions"]),
         "ai_evidence_package": {"limitations": limitations},
     }
@@ -1110,12 +1109,12 @@ def _empty_diagnostic(metric_map: dict, domain: dict, reason: str) -> dict:
         "severity": "warning",
         "metric": metric_map.get("primary_metric"),
         "period": None,
-        "what_changed": "Nao foi possivel medir variacao.",
+        "what_changed": "Ainda nao foi possivel medir mudanca entre periodos.",
         "how_much": reason,
-        "where": "Dataset completo.",
+        "where": "Arquivo completo.",
         "possible_causes": [reason],
-        "managerial_impact": "A analise fica limitada a KPIs descritivos.",
-        "recommendation": "Validar periodo e granularidade do arquivo.",
+        "managerial_impact": "A analise fica limitada a uma leitura descritiva.",
+        "recommendation": "Validar periodo e nivel de detalhe do arquivo.",
         "confidence": "baixa",
         "evidence": [reason],
     }
@@ -1130,7 +1129,7 @@ def _empty_diagnostic(metric_map: dict, domain: dict, reason: str) -> dict:
         "comparative_summary": {"cards": [], "readings": []},
         "driver_evidence": [],
         "alerts": [reason],
-        "recommendations": ["Validar periodo e granularidade do arquivo."],
+        "recommendations": ["Validar periodo e nivel de detalhe do arquivo."],
         "ai_evidence_package": {"domain": domain, "metric_map": metric_map, "limitations": [reason]},
     }
 
@@ -1211,7 +1210,7 @@ def _abnormal_insights(abnormal_periods: pd.DataFrame, primary_metric: str) -> l
 def _kpis(period_metrics: pd.DataFrame, primary_metric: str, latest: pd.Series, largest_increase: pd.Series, largest_drop: pd.Series) -> list[dict]:
     return [
         {
-            "label": "Metrica principal",
+            "label": "Indicador principal",
             "value": primary_metric,
             "detail": "Base da analise gerencial",
         },
@@ -1263,7 +1262,7 @@ def _alerts(
             alerts.append(f"Alta superior a 50% em {period_label}; validar risco de excesso, pico artificial ou mudanca pontual.")
     for support_name in metric_map["support_metrics"]:
         if support_name in period_metrics.columns and period_metrics[support_name].isna().mean() > 0.2:
-            alerts.append(f"A metrica de apoio {support_name} possui lacunas e reduz a confianca da explicacao.")
+            alerts.append(f"O fator de apoio {support_name} possui lacunas e reduz a confianca da explicacao.")
     alerts.extend(_support_metric_alerts(period_metrics, metric_map, focus))
     alerts.extend(_dimension_alerts(root_cause_analysis or {}))
     return alerts or ["Nenhum alerta critico adicional na leitura gerencial inicial."]
@@ -1310,7 +1309,7 @@ def _recommendations(domain_type: str, focus: pd.Series, primary_metric: str, dr
     direction = "alta" if float(focus["variacao"]) >= 0 else "queda"
     recommendations = [_primary_recommendation(domain_type, "subiu" if direction == "alta" else "caiu")]
     if driver_evidence:
-        recommendations.append(f"Validar o driver mais associado: {driver_evidence[0]['column']}.")
+        recommendations.append(f"Validar o fator de apoio mais associado: {driver_evidence[0]['column']}.")
     if not abnormal_periods.empty:
         recommendations.append("Priorizar a revisao dos periodos fora do padrao antes de fechar conclusoes.")
     recommendations.append(f"Confirmar regra de negocio para interpretar {primary_metric} antes de tomar acao operacional.")
@@ -1318,7 +1317,7 @@ def _recommendations(domain_type: str, focus: pd.Series, primary_metric: str, dr
 
 
 def _suggested_questions(domain_type: str, metric_map: dict, dimensions: list[dict]) -> list[str]:
-    metric = metric_map.get("primary_metric") or "a metrica principal"
+    metric = metric_map.get("primary_metric") or "o indicador principal"
     dimension = dimensions[0]["column"] if dimensions else "categoria"
     questions = [
         f"Por que {metric} variou no ultimo periodo?",
@@ -1393,33 +1392,32 @@ def _driver_interpretation(
     relation = ""
     if corr is not None:
         if corr <= -0.35:
-            relation = " A relacao historica com a metrica principal e negativa, entao movimentos opostos podem ser relevantes."
+            relation = " A relacao historica com o indicador principal e negativa, entao movimentos opostos podem ser relevantes."
         elif corr >= 0.35:
-            relation = " A relacao historica com a metrica principal e positiva, entao movimentos na mesma direcao podem ser relevantes."
+            relation = " A relacao historica com o indicador principal e positiva, entao movimentos na mesma direcao podem ser relevantes."
 
     if group_name == "volume_operacional":
         if metric_direction == "caiu" and driver_direction == "subiu":
             return (
-                f"{column} subiu de {_format_number(previous_value)} para {_format_number(current_value)}, "
-                "o que sugere consumo/saida operacional maior pressionando a queda."
+                f"{column} subiu no periodo, o que sugere consumo ou saida operacional maior pressionando a queda."
             )
         if metric_direction == "subiu" and driver_direction == "caiu":
             return (
-                f"{column} caiu para {_format_number(current_value)} enquanto a metrica subiu, "
+                f"{column} caiu enquanto o indicador subiu, "
                 "sugerindo menor consumo, acumulacao ou reposicao acima da saida."
             )
     if group_name == "custo":
         return (
-            f"{column} {driver_direction} para {_format_number(current_value)} no periodo analisado."
+            f"{column} tambem {driver_direction} no periodo analisado."
             f"{relation}"
         )
     if group_name == "estoque_fabrica":
         return (
-            f"{column} ficou em {_format_number(current_value)} no periodo, ajudando a diferenciar estoque total de estoque em fabrica."
+            f"{column} ajuda a diferenciar estoque total de estoque em fabrica no periodo."
         )
 
     return (
-        f"{column} {driver_direction} de {_format_number(previous_value)} para {_format_number(current_value)}."
+        f"{column} tambem {driver_direction} no periodo analisado."
         f"{relation}"
     )
 
@@ -1427,11 +1425,11 @@ def _driver_interpretation(
 def _context_limitations(metric_map: dict, time_context: dict, dimensions: list[dict]) -> list[str]:
     limitations = []
     if not metric_map.get("primary_metric"):
-        limitations.append("Nao foi detectada uma metrica numerica principal clara.")
+        limitations.append("Nao encontrei um indicador principal claro para analisar.")
     if not time_context.get("available"):
-        limitations.append("Nao foi detectada coluna de tempo ou combinacao ano + mes confiavel.")
+        limitations.append("Nao encontrei uma coluna de periodo para comparar mes a mes.")
     if not dimensions:
-        limitations.append("Nao foi detectada dimensao clara para localizar onde a variacao ocorreu.")
+        limitations.append("Nao encontrei produto, cliente, fornecedor ou outro recorte para explicar a mudanca.")
     return limitations
 
 
@@ -1502,13 +1500,13 @@ def _primary_recommendation(domain_type: str, direction: str) -> str:
         return "Validar mix de produtos/clientes e campanhas ou eventos que expliquem o movimento."
     if domain_type == "compras":
         return "Validar pedidos, fornecedores e prazos que concentraram o movimento."
-    return "Validar os principais registros do periodo e confirmar a regra de negocio da metrica."
+    return "Validar os principais registros do periodo e confirmar a regra de negocio do indicador."
 
 
 def _generic_cause(domain_type: str, direction: str) -> str:
     if domain_type == "estoque_operacao":
         return "Possivel efeito de entradas, saidas, consumo operacional, transferencia ou reposicao."
-    return f"Possivel efeito de mix, volume, sazonalidade ou mudanca operacional; a metrica {direction} no periodo."
+    return f"Possivel efeito de mix, volume, sazonalidade ou mudanca operacional; o indicador {direction} no periodo."
 
 
 def _is_additive_support(group_name: str) -> bool:

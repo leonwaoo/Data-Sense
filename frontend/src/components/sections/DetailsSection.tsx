@@ -20,7 +20,7 @@ export function DetailsSection({
         <div className="panel-heading">
           <div>
             <h2>Detalhes tecnicos</h2>
-            <span>Estrutura, qualidade e metricas usadas pela analise</span>
+            <span>Estrutura, qualidade e indicadores usados pela analise</span>
           </div>
         </div>
 
@@ -28,15 +28,15 @@ export function DetailsSection({
           <MetricCard icon={<Database size={20} />} label="Arquivo" value={dataset.file_name} />
           <MetricCard icon={<TableProperties size={20} />} label="Linhas" value={profile.rows.toLocaleString("pt-BR")} />
           <MetricCard icon={<BarChart3 size={20} />} label="Colunas" value={String(profile.columns)} />
-          <MetricCard icon={<ShieldCheck size={20} />} label="Qualidade" value={`${quality.score}/100`} />
+          <MetricCard icon={<ShieldCheck size={20} />} label="Pontuacao" value={`${quality.score}/100`} />
         </div>
       </section>
 
       <section className="panel technical-grid-panel">
         <article>
-          <strong>Campos detectados</strong>
+          <strong>Campos encontrados</strong>
           <p>Datas: {profile.datetime_columns.join(", ") || "nenhuma"}</p>
-          <p>Numericas: {profile.numeric_columns.join(", ") || "nenhuma"}</p>
+          <p>Numericos: {profile.numeric_columns.join(", ") || "nenhum"}</p>
           <p>Categorias: {profile.categorical_columns.join(", ") || "nenhuma"}</p>
         </article>
         <article>
@@ -47,9 +47,9 @@ export function DetailsSection({
         </article>
         <article>
           <strong>Analise gerencial</strong>
-          <p>Metrica principal: {analysis?.context.metric_map.primary_metric ?? "nao detectada"}</p>
-          <p>Tempo: {analysis?.context.time.label ?? "nao detectado"}</p>
-          <p>Apoio: {supportMetrics.join(", ") || "nenhum"}</p>
+          <p>Indicador principal: {analysis?.context.metric_map.primary_metric ?? "nao detectado"}</p>
+          <p>Periodo: {analysis?.context.time.label ?? "nao detectado"}</p>
+          <p>Fatores de apoio: {supportMetrics.join(", ") || "nenhum"}</p>
         </article>
       </section>
 
@@ -57,8 +57,8 @@ export function DetailsSection({
         <section className="panel">
           <div className="panel-heading">
             <div>
-              <h2>KPIs calculados</h2>
-              <span>Indicadores usados como base do dashboard</span>
+              <h2>Indicadores calculados</h2>
+              <span>Base numerica usada nos graficos e relatorios</span>
             </div>
           </div>
           <div className="technical-kpi-list">

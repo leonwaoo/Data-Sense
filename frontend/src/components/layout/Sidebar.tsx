@@ -5,7 +5,7 @@ const NAV_ITEMS: { key: SectionKey; label: string; icon: typeof LineChart; hint:
   { key: "overview", label: "Inicio", icon: LineChart, hint: "Leitura simples para decisao" },
   { key: "diagnostic", label: "Diagnostico", icon: Stethoscope, hint: "Causa raiz e acoes" },
   { key: "dashboard", label: "Graficos", icon: LayoutDashboard, hint: "Visualizacao dos dados" },
-  { key: "details", label: "Detalhes", icon: FileText, hint: "Metricas e qualidade" },
+  { key: "details", label: "Detalhes", icon: FileText, hint: "Indicadores e qualidade" },
   { key: "chat", label: "Chat analitico", icon: MessageSquareText, hint: "Pergunte aos dados" },
   { key: "reports", label: "Relatorios", icon: ShieldCheck, hint: "Exportar e historico" },
 ];
@@ -68,7 +68,7 @@ export function Sidebar({
             </div>
           </div>
         ) : (
-          <p className="sidebar-empty">Envie um dataset para liberar as secoes.</p>
+          <p className="sidebar-empty">Envie um arquivo para liberar as secoes.</p>
         )}
       </div>
     </aside>

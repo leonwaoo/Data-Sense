@@ -1,6 +1,6 @@
 import { Clock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatNumberCell } from "../../utils/format";
 import type { ManagerialAnalysis } from "../../types";
 
@@ -10,16 +10,10 @@ type MonthlyChartPoint = {
   value: number;
 };
 
-type MonthlyDotProps = {
-  cx?: number;
-  cy?: number;
-  payload?: MonthlyChartPoint;
-};
-
 const monthNames = [
   "Janeiro",
   "Fevereiro",
-  "Marco",
+  "Março",
   "Abril",
   "Maio",
   "Junho",
@@ -55,6 +49,16 @@ function chartPayloadPeriod(state: unknown) {
   return payload.activePayload?.[0]?.payload?.period;
 }
 
+function MonthlyTooltip({ active, label, payload }: { active?: boolean; label?: string; payload?: { value?: number }[] }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="monthly-chart-tooltip">
+      <span>{label}</span>
+      <strong>{formatNumberCell(Number(payload[0]?.value ?? 0))}</strong>
+    </div>
+  );
+}
+
 export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnalysis }) {
   const monthlyComparisons = [...(analysis.monthly_comparisons ?? [])].sort(
     (left, right) => periodOrder(left.period) - periodOrder(right.period),
@@ -84,25 +88,7 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
     if (period) setSelectedPeriod(period);
   }
 
-  function renderMonthlyDot(props: unknown) {
-    const { cx, cy, payload } = props as MonthlyDotProps;
-    if (typeof cx !== "number" || typeof cy !== "number" || !payload) {
-      return <circle cx={0} cy={0} fill="transparent" r={0} />;
-    }
-    const selected = payload.period === selectedMonth.period;
-    return (
-      <circle
-        className={selected ? "monthly-chart-dot is-selected" : "monthly-chart-dot"}
-        cx={cx}
-        cy={cy}
-        fill={selected ? "#0f766e" : "#ffffff"}
-        onClick={() => setSelectedPeriod(payload.period)}
-        r={selected ? 6 : 3.5}
-        stroke="#0f766e"
-        strokeWidth={selected ? 3 : 2}
-      />
-    );
-  }
+  const selectedChartPoint = chartData.find((item) => item.period === selectedMonth.period);
 
   return (
     <section className="panel monthly-focus-panel simple-monthly-panel">
@@ -137,22 +123,40 @@ export function MonthlyAnalysisSection({ analysis }: { analysis: ManagerialAnaly
             <strong>Tendencia visual</strong>
             <span>O marcador indica o mes selecionado</span>
           </div>
-          <ResponsiveContainer height={240} width="100%">
-            <LineChart data={chartData} margin={{ bottom: 8, left: 0, right: 12, top: 14 }} onClick={handleChartClick}>
-              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-              <XAxis dataKey="label" minTickGap={18} tick={{ fill: "#64748b", fontSize: 12 }} />
-              <Tooltip formatter={(value) => formatNumberCell(Number(value))} labelFormatter={(label) => `Periodo ${label}`} />
+          <ResponsiveContainer height={260} width="100%">
+            <AreaChart data={chartData} margin={{ bottom: 6, left: 0, right: 20, top: 18 }} onClick={handleChartClick}>
+              <defs>
+                <linearGradient id="monthlyTrendFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.24} />
+                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#e5e7eb" vertical={false} />
+              <XAxis axisLine={false} dataKey="label" minTickGap={18} tick={{ fill: "#64748b", fontSize: 12 }} tickLine={false} />
+              <YAxis axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} tickFormatter={(value) => formatNumberCell(Number(value))} tickLine={false} width={46} />
+              <Tooltip content={<MonthlyTooltip />} cursor={{ stroke: "#0f766e", strokeOpacity: 0.25 }} />
               <ReferenceLine ifOverflow="extendDomain" stroke="#0f766e" strokeDasharray="4 4" strokeOpacity={0.75} x={selectedLabel} />
-              <Line
-                activeDot={{ r: 7, stroke: "#0f766e", strokeWidth: 3 }}
+              <Area
+                activeDot={{ fill: "#0f766e", r: 7, stroke: "#fff", strokeWidth: 3 }}
                 dataKey="value"
-                dot={renderMonthlyDot}
+                fill="url(#monthlyTrendFill)"
                 name="Valor"
                 stroke="#0f766e"
-                strokeWidth={2.5}
+                strokeWidth={3}
                 type="monotone"
               />
-            </LineChart>
+              {selectedChartPoint ? (
+                <ReferenceDot
+                  className="monthly-chart-dot is-selected"
+                  fill="#0f766e"
+                  r={6}
+                  stroke="#fff"
+                  strokeWidth={3}
+                  x={selectedChartPoint.label}
+                  y={selectedChartPoint.value}
+                />
+              ) : null}
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 

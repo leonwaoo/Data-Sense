@@ -5,10 +5,12 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Line,
   LineChart,
   Pie,
   PieChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,13 +18,63 @@ import {
 } from "recharts";
 import type { ChartPayload } from "../../types";
 
-function getXAxisProps(chart: ChartPayload) {
-  const hasManyPoints = chart.data.length > 10;
-  return {
-    interval: hasManyPoints ? ("preserveStartEnd" as const) : 0,
-    minTickGap: chart.type === "line" || chart.type === "area" ? 18 : 12,
-    tick: { fontSize: 11 },
-  };
+type ChartDatum = Record<string, string | number>;
+
+const compactNumber = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 1,
+  notation: "compact",
+});
+
+function valueOf(item: ChartDatum | undefined, key: string): number {
+  const value = item?.[key];
+  return typeof value === "number" ? value : Number(value ?? 0);
+}
+
+function labelOf(item: ChartDatum | undefined, key: string): string {
+  return String(item?.[key] ?? "");
+}
+
+function formatValue(value: string | number | undefined) {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (Number.isFinite(numeric)) return compactNumber.format(numeric);
+  return String(value ?? "");
+}
+
+function sortedData(chart: ChartPayload) {
+  if (chart.type === "bar") {
+    return [...chart.data].sort((a, b) => Math.abs(valueOf(b, chart.y)) - Math.abs(valueOf(a, chart.y))).slice(0, 10);
+  }
+  if (chart.type === "pie") {
+    return [...chart.data].sort((a, b) => valueOf(b, chart.y) - valueOf(a, chart.y)).slice(0, 8);
+  }
+  return chart.data;
+}
+
+function lineFocus(data: ChartDatum[], chart: ChartPayload) {
+  return data.length ? data[data.length - 1] : null;
+}
+
+function CustomTooltip({ active, label, payload }: { active?: boolean; label?: string; payload?: { value?: string | number }[] }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="chart-tooltip">
+      <span>{label}</span>
+      <strong>{formatValue(payload[0]?.value)}</strong>
+    </div>
+  );
+}
+
+function ValueLabel({ x, y, width, value }: { x?: number; y?: number; width?: number; value?: string | number }) {
+  if (x === undefined || y === undefined || width === undefined) return null;
+  return (
+    <text className="chart-value-label" dominantBaseline="middle" x={x + width + 8} y={y + 10}>
+      {formatValue(value)}
+    </text>
+  );
+}
+
+function BarValueLabel(props: unknown) {
+  return <ValueLabel {...(props as { x?: number; y?: number; width?: number; value?: string | number })} />;
 }
 
 export function ChartRenderer({
@@ -34,60 +86,134 @@ export function ChartRenderer({
   colors: string[];
   height: number;
 }) {
-  const xAxisProps = getXAxisProps(chart);
+  const data = sortedData(chart);
+  const primary = colors[0] ?? "#0f766e";
+  const comparison = colors[1] ?? "#2563eb";
+  const focus = lineFocus(data, chart);
+  const gradientId = `chart-fill-${chart.x.replace(/\W/g, "")}-${chart.y.replace(/\W/g, "")}`;
+  const maxLabelWidth = data.some((item) => labelOf(item, chart.x).length > 18) ? 120 : 96;
+
+  if (!data.length) {
+    return <div className="chart-empty" style={{ minHeight: height }}>Sem dados suficientes para montar este grafico.</div>;
+  }
 
   if (chart.type === "area") {
     return (
-      <ResponsiveContainer height={height} width="100%">
-        <AreaChart data={chart.data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={chart.x} {...xAxisProps} />
-          <YAxis />
-          <Tooltip />
-          <Area dataKey={chart.y} fill={colors[0]} fillOpacity={0.18} stroke={colors[0]} strokeWidth={3} type="monotone" />
-        </AreaChart>
-      </ResponsiveContainer>
+      <div className="chart-frame chart-frame-area">
+        <ResponsiveContainer height={height} width="100%">
+          <AreaChart data={data} margin={{ bottom: 4, left: 0, right: 24, top: 16 }}>
+            <defs>
+              <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={primary} stopOpacity={0.28} />
+                <stop offset="100%" stopColor={primary} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <XAxis axisLine={false} dataKey={chart.x} minTickGap={20} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickLine={false} />
+            <YAxis axisLine={false} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickFormatter={formatValue} tickLine={false} width={42} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--chart-cursor)", strokeWidth: 1 }} />
+            <Area dataKey={chart.y} fill={`url(#${gradientId})`} stroke={primary} strokeWidth={3} type="monotone" />
+            {focus ? <ReferenceDot fill={primary} r={5} stroke="#fff" strokeWidth={2} x={focus[chart.x]} y={focus[chart.y]} /> : null}
+          </AreaChart>
+        </ResponsiveContainer>
+        {focus ? (
+          <div className="chart-focus-note">
+            <span>Ultimo ponto</span>
+            <strong>{labelOf(focus, chart.x)}: {formatValue(focus[chart.y])}</strong>
+          </div>
+        ) : null}
+      </div>
     );
   }
 
   if (chart.type === "line") {
     return (
-      <ResponsiveContainer height={height} width="100%">
-        <LineChart data={chart.data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey={chart.x} {...xAxisProps} />
-          <YAxis />
-          <Tooltip />
-          <Line dataKey={chart.y} stroke={colors[0]} strokeWidth={3} type="monotone" />
-        </LineChart>
-      </ResponsiveContainer>
+      <div className="chart-frame chart-frame-line">
+        <ResponsiveContainer height={height} width="100%">
+          <LineChart data={data} margin={{ bottom: 4, left: 0, right: 24, top: 16 }}>
+            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
+            <XAxis axisLine={false} dataKey={chart.x} minTickGap={20} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickLine={false} />
+            <YAxis axisLine={false} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickFormatter={formatValue} tickLine={false} width={42} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--chart-cursor)", strokeWidth: 1 }} />
+            <Line activeDot={{ fill: primary, r: 6, stroke: "#fff", strokeWidth: 2 }} dataKey={chart.y} dot={false} stroke={primary} strokeWidth={3} type="monotone" />
+            {focus ? <ReferenceDot fill={primary} r={5} stroke="#fff" strokeWidth={2} x={focus[chart.x]} y={focus[chart.y]} /> : null}
+          </LineChart>
+        </ResponsiveContainer>
+        {focus ? (
+          <div className="chart-focus-note">
+            <span>Ultimo ponto</span>
+            <strong>{labelOf(focus, chart.x)}: {formatValue(focus[chart.y])}</strong>
+          </div>
+        ) : null}
+      </div>
     );
   }
 
   if (chart.type === "pie") {
+    const total = data.reduce((sum, item) => sum + Math.max(0, valueOf(item, chart.y)), 0);
     return (
-      <ResponsiveContainer height={height} width="100%">
-        <PieChart>
-          <Tooltip />
-          <Pie data={chart.data} dataKey={chart.y} innerRadius={44} nameKey={chart.x} outerRadius={92} paddingAngle={2}>
-            {chart.data.map((_, index) => (
-              <Cell fill={colors[index % colors.length]} key={index} />
-            ))}
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="chart-frame chart-donut-layout">
+        <ResponsiveContainer height={height} width="100%">
+          <PieChart>
+            <Tooltip content={<CustomTooltip />} />
+            <Pie
+              cx="50%"
+              cy="50%"
+              data={data}
+              dataKey={chart.y}
+              innerRadius="58%"
+              nameKey={chart.x}
+              outerRadius="82%"
+              paddingAngle={2}
+            >
+              {data.map((_, index) => (
+                <Cell fill={colors[index % colors.length]} key={index} stroke="#fff" strokeWidth={2} />
+              ))}
+            </Pie>
+            <text className="chart-donut-total" dominantBaseline="middle" textAnchor="middle" x="50%" y="48%">
+              {formatValue(total)}
+            </text>
+            <text className="chart-donut-caption" dominantBaseline="middle" textAnchor="middle" x="50%" y="57%">
+              total
+            </text>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="chart-direct-legend">
+          {data.slice(0, 5).map((item, index) => (
+            <span key={`${item[chart.x]}-${index}`}>
+              <i style={{ background: colors[index % colors.length] }} />
+              {labelOf(item, chart.x)} <strong>{formatValue(item[chart.y])}</strong>
+            </span>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <ResponsiveContainer height={height} width="100%">
-      <BarChart data={chart.data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey={chart.x} {...xAxisProps} />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey={chart.y} fill={colors[0]} radius={[6, 6, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="chart-frame chart-frame-bar">
+      <ResponsiveContainer height={height} width="100%">
+        <BarChart data={data} layout="vertical" margin={{ bottom: 4, left: 8, right: 48, top: 8 }}>
+          <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
+          <XAxis axisLine={false} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickFormatter={formatValue} tickLine={false} type="number" />
+          <YAxis
+            axisLine={false}
+            dataKey={chart.x}
+            tick={{ fill: "var(--chart-text)", fontSize: 12 }}
+            tickFormatter={(value) => String(value).length > 18 ? `${String(value).slice(0, 18)}...` : String(value)}
+            tickLine={false}
+            type="category"
+            width={maxLabelWidth}
+          />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--chart-hover)" }} />
+          <Bar background={{ fill: "var(--chart-track)" }} dataKey={chart.y} fill={primary} radius={[0, 8, 8, 0]}>
+            <LabelList content={BarValueLabel} dataKey={chart.y} />
+            {data.map((_, index) => (
+              <Cell fill={index === 0 ? primary : comparison} fillOpacity={index === 0 ? 1 : 0.72} key={index} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

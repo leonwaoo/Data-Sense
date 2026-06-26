@@ -269,6 +269,27 @@
   cursor: pointer;
 }
 
+.monthly-chart-tooltip {
+  background: #0f172a;
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-sm);
+  color: #fff;
+  display: grid;
+  gap: 2px;
+  min-width: 120px;
+  padding: 8px 10px;
+}
+
+.monthly-chart-tooltip span {
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.monthly-chart-tooltip strong {
+  font-size: 0.9rem;
+}
+
 .monthly-chart-dot {
   cursor: pointer;
   transition: r 120ms ease, stroke-width 120ms ease;

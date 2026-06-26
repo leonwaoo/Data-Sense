@@ -181,10 +181,11 @@ export function ManagerialInsightsSection({
               <article className="dimension-narrative-card" key={item.dimension}>
                 <div>
                   <strong>{item.label}</strong>
-                  <span>{item.share_concentration.level} prioridade</span>
+                  <span>{item.priority?.level ?? item.share_concentration.level} prioridade</span>
                 </div>
                 <p>{item.narrative}</p>
                 <small>{item.managerial_impact}</small>
+                {item.priority?.reason ? <small>{item.priority.reason}</small> : null}
                 <div className="dimension-narrative-movers">
                   {(item.top_movers ?? []).slice(0, 3).map((mover) => (
                     <span key={`${item.dimension}-${mover.name}`}>{mover.name}</span>
@@ -198,6 +199,20 @@ export function ManagerialInsightsSection({
                       </span>
                     ))}
                   </div>
+                ) : null}
+                {(item.validation_questions ?? []).length ? (
+                  <div className="dimension-narrative-questions">
+                    {(item.validation_questions ?? []).slice(0, 2).map((question) => (
+                      <p key={`${item.dimension}-${question}`}>{question}</p>
+                    ))}
+                  </div>
+                ) : null}
+                {(item.action_checklist ?? []).length ? (
+                  <ul className="dimension-narrative-actions">
+                    {(item.action_checklist ?? []).slice(0, 3).map((action) => (
+                      <li key={`${item.dimension}-${action}`}>{action}</li>
+                    ))}
+                  </ul>
                 ) : null}
                 {item.recommendation ? <footer>{item.recommendation}</footer> : null}
               </article>

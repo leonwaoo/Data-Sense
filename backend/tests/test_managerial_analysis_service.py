@@ -245,6 +245,9 @@ def test_managerial_analysis_ranks_dimension_contributors_and_concentration_aler
     assert dimension_narratives
     assert dimension_narratives[0]["label"] in {"Produto", "Categoria"}
     assert "managerial_impact" in dimension_narratives[0]
+    assert dimension_narratives[0]["priority"]["level"] in {"alta", "media", "baixa"}
+    assert dimension_narratives[0]["validation_questions"]
+    assert dimension_narratives[0]["action_checklist"]
     assert any("Cafe A" in alert for alert in alerts)
     assert any("Cafe A" in alert for alert in analysis["alerts"])
     assert any("mais de 80%" in alert for alert in analysis["alerts"])
@@ -294,6 +297,7 @@ def test_managerial_analysis_uses_rich_sales_support_metrics_and_cross_context()
     assert {"Qtd Pedidos", "Volume Vendido", "Desconto (%)", "Devolucoes", "OEE", "Taxa Aprovacao", "Margem EBITDA"}.issubset(support_columns)
     assert any(item["dimension"] == "Canal" and item["name"] == "E-commerce" for item in centro["context"])
     assert any(item["dimension"] == "Produto" and item["name"] == "Cafe Robusta" for item in centro["context"])
+    assert any("margem" in question.lower() for question in analysis["dimension_narratives"][0]["validation_questions"])
     assert any("2024-12" in alert for alert in alerts)
 
 

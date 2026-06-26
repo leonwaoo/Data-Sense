@@ -566,6 +566,88 @@ def _dimension_recommendation(domain_type: str, dimension_label: str, top: dict,
     return f"Investigue {name} em {dimension_label} antes de expandir a leitura para os demais recortes."
 
 
+def _dimension_priority(top: dict, share_abs: float, historical_delta: float | None) -> dict:
+    recurrence = str(top.get("recurrence_flag") or "pontual")
+    concentration = str(top.get("concentration_level") or _concentration_level(share_abs))
+    if share_abs >= 0.8 or concentration == "alta":
+        level = "alta"
+    elif share_abs >= 0.6 or recurrence == "recorrente":
+        level = "media"
+    else:
+        level = "baixa"
+
+    reasons = [f"explica {_format_pct(share_abs)} da variacao absoluta"]
+    if recurrence == "recorrente":
+        reasons.append("aparece de forma recorrente entre os principais movimentos")
+    if historical_delta is not None:
+        reasons.append(f"ficou {_format_signed_number(historical_delta)} contra a media historica")
+    return {"level": level, "reason": "; ".join(reasons)}
+
+
+def _dimension_validation_questions(domain_type: str, dimension_label: str, top: dict) -> list[str]:
+    name = top.get("name") or "recorte principal"
+    context_items = [f"{item.get('dimension')}: {item.get('name')}" for item in top.get("context", []) if item.get("name")]
+    context_text = f" junto com {', '.join(context_items[:2])}" if context_items else ""
+    if domain_type == "estoque_operacao":
+        return [
+            f"Houve consumo, transferencia ou ajuste de estoque em {name}{context_text}?",
+            f"A reposicao planejada de {name} acompanhou a variacao do periodo?",
+            f"O movimento aparece tambem em estoque fabrica, custo ou volume operacional?",
+        ]
+    if domain_type == "vendas":
+        return [
+            f"O movimento de {name}{context_text} veio de campanha, preco, cliente ou canal?",
+            f"A margem acompanhou a variacao de receita nesse recorte?",
+            f"Esse comportamento e pontual ou se repetiu nos ultimos meses?",
+        ]
+    if domain_type == "compras":
+        return [
+            f"A variacao de {name}{context_text} veio de fornecedor, item, prazo ou custo?",
+            "Houve pedido fora do padrao, antecipacao, atraso ou mudanca de contrato?",
+            "Existe dependencia operacional concentrada nesse recorte?",
+        ]
+    return [
+        f"Quais registros explicam a mudanca de {name} em {dimension_label}?",
+        "O movimento e recorrente ou pontual?",
+        "Existe alguma classificacao, regra ou evento operacional que distorceu o periodo?",
+    ]
+
+
+def _dimension_action_checklist(domain_type: str, dimension_label: str, top: dict, share_abs: float) -> list[str]:
+    name = top.get("name") or "recorte principal"
+    actions = [
+        f"Filtrar {dimension_label}: {name}.",
+        "Comparar periodo atual, periodo anterior e media historica.",
+    ]
+    if domain_type == "estoque_operacao":
+        actions.extend(
+            [
+                "Validar entradas, saidas, transferencias e ajustes de estoque.",
+                "Checar se volume operacional e estoque fabrica explicam a mudanca.",
+            ]
+        )
+    elif domain_type == "vendas":
+        actions.extend(
+            [
+                "Cruzar com cliente, canal, produto, desconto e margem.",
+                "Separar efeito de volume, preco, mix e campanha.",
+            ]
+        )
+    elif domain_type == "compras":
+        actions.extend(
+            [
+                "Cruzar com fornecedor, item, prazo e custo.",
+                "Validar pedidos fora do padrao e dependencia de abastecimento.",
+            ]
+        )
+    else:
+        actions.append("Conferir registros que mais pesaram antes de generalizar a conclusao.")
+
+    if share_abs >= 0.8:
+        actions.append("Tratar como prioridade antes de analisar os demais recortes.")
+    return actions[:5]
+
+
 def _dimension_narratives(
     dimension_drivers: list[dict],
     domain_type: str,
@@ -584,10 +666,11 @@ def _dimension_narratives(
         share = _safe_float(top.get("share_of_abs_change")) or 0
         historical_delta = _safe_float(top.get("historical_delta"))
         historical_mean = _safe_float(top.get("historical_mean"))
+        dimension_label = driver.get("label") or driver.get("dimension")
         narratives.append(
             {
                 "dimension": driver.get("dimension"),
-                "label": driver.get("label"),
+                "label": dimension_label,
                 "top_movers": contributors[:3],
                 "share_concentration": {
                     "top_1": _round_or_none(share),
@@ -603,7 +686,7 @@ def _dimension_narratives(
                 },
                 "narrative": _dimension_narrative_text(
                     domain_type,
-                    driver.get("label") or driver.get("dimension"),
+                    dimension_label,
                     primary_metric,
                     focus_period,
                     previous_period,
@@ -613,7 +696,10 @@ def _dimension_narratives(
                 ),
                 "managerial_impact": _dimension_managerial_impact(domain_type, top, share),
                 "possible_causes": _dimension_possible_causes(domain_type, top, share),
-                "recommendation": _dimension_recommendation(domain_type, driver.get("label") or driver.get("dimension"), top, share),
+                "recommendation": _dimension_recommendation(domain_type, dimension_label, top, share),
+                "priority": _dimension_priority(top, share, historical_delta),
+                "validation_questions": _dimension_validation_questions(domain_type, dimension_label, top),
+                "action_checklist": _dimension_action_checklist(domain_type, dimension_label, top, share),
             }
         )
     return narratives[:4]

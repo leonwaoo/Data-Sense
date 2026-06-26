@@ -50,6 +50,7 @@ def test_report_managerial_items_keep_executive_reading_and_technical_details() 
     assert any("Concentracao relevante: Cafe A" in item for item in root_items)
     assert any("Movimento critico" in item for item in monthly_items)
     assert any("Produto:" in item or "Categoria:" in item for item in dimension_items)
+    assert any("Pergunta-chave:" in item and "Primeira acao:" in item for item in dimension_items)
     assert any("linhas" in item and "colunas" in item for item in technical_items)
 
 

@@ -196,6 +196,12 @@ export type DimensionNarrative = {
   managerial_impact: string;
   possible_causes?: string[];
   recommendation?: string;
+  priority?: {
+    level: "alta" | "media" | "baixa" | string;
+    reason: string;
+  };
+  validation_questions?: string[];
+  action_checklist?: string[];
 };
 
 export type RootCauseWaterfallStep = {

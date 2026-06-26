@@ -284,10 +284,19 @@ def _managerial_dimension_items(context: ReportContext) -> list[str]:
         text = f"{item.get('label')}: {item.get('narrative')}"
         impact = item.get("managerial_impact")
         recommendation = item.get("recommendation")
+        priority = item.get("priority") or {}
+        questions = item.get("validation_questions") or []
+        actions = item.get("action_checklist") or []
+        if priority.get("level"):
+            text += f" Prioridade: {priority.get('level')} ({priority.get('reason')})."
         if impact:
             text += f" Impacto: {impact}"
         if recommendation:
             text += f" Recomendacao: {recommendation}"
+        if questions:
+            text += f" Pergunta-chave: {questions[0]}"
+        if actions:
+            text += f" Primeira acao: {actions[0]}"
         items.append(text)
     return items or ["Sem leituras por dimensao suficientes para exportacao."]
 

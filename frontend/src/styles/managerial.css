@@ -768,6 +768,32 @@
   font-size: inherit;
 }
 
+.dimension-narrative-questions {
+  display: grid;
+  gap: 6px;
+}
+
+.dimension-narrative-questions p {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.dimension-narrative-actions {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.8rem;
+  gap: 5px;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .managerial-comparative-panel {
   background: var(--surface-2);
   border: 1px solid var(--border);

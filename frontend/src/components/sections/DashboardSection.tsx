@@ -1,4 +1,16 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, FileImage, LayoutDashboard, Printer, SlidersHorizontal, TrendingUp } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  BarChart3,
+  Eye,
+  EyeOff,
+  FileImage,
+  LayoutDashboard,
+  ListChecks,
+  Printer,
+  SlidersHorizontal,
+  TrendingUp,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { dashboardThemeMap } from "../../constants";
@@ -49,6 +61,9 @@ export function DashboardSection({
   }, [chartOrder, dashboard, hiddenCharts]);
   const featuredChart = orderedCharts[0] ?? null;
   const secondaryCharts = orderedCharts.slice(1);
+  const highlightKpis = dashboard?.kpis.slice(0, 4) ?? [];
+  const visibleRows = dashboard?.filters.rows_after_filter ?? 0;
+  const totalRows = dashboard?.filters.rows_before_filter ?? 0;
 
   function moveChart(chartId: string, direction: -1 | 1) {
     setChartOrder((current) => {
@@ -131,6 +146,44 @@ export function DashboardSection({
         <span className="domain-pill">{dashboard.domain.label}</span>
       </div>
 
+      <div className="dashboard-executive-strip">
+        <article className="dashboard-executive-card dashboard-executive-main">
+          <div>
+            <TrendingUp size={18} />
+            <span>Leitura principal</span>
+          </div>
+          <strong>{dashboard.insights[0] ?? "Arquivo pronto para exploracao visual."}</strong>
+        </article>
+        <article className="dashboard-executive-card">
+          <div>
+            <ListChecks size={18} />
+            <span>Dados em analise</span>
+          </div>
+          <strong>{visibleRows.toLocaleString("pt-BR")} linhas</strong>
+          <small>{totalRows && totalRows !== visibleRows ? `de ${totalRows.toLocaleString("pt-BR")} apos filtros` : "sem filtros aplicados"}</small>
+        </article>
+        <article className="dashboard-executive-card">
+          <div>
+            <BarChart3 size={18} />
+            <span>Graficos ativos</span>
+          </div>
+          <strong>{orderedCharts.length}</strong>
+          <small>{hiddenCharts.size ? `${hiddenCharts.size} oculto(s)` : "todos visiveis"}</small>
+        </article>
+      </div>
+
+      {highlightKpis.length ? (
+        <div className="dashboard-kpi-ribbon">
+          {highlightKpis.map((kpi) => (
+            <article className={`dashboard-kpi-chip tone-${kpi.tone ?? "neutral"}`} key={`${kpi.label}-${kpi.value}`}>
+              <span>{kpi.label}</span>
+              <strong>{kpi.value}</strong>
+              <small>{kpi.detail}</small>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
       <details className="dashboard-controls no-print">
         <summary>
           <SlidersHorizontal size={16} />
@@ -159,62 +212,76 @@ export function DashboardSection({
       </details>
 
       {featuredChart ? (
-        <article className="dashboard-chart-card dashboard-featured-chart">
-          <div className="chart-card-heading">
-            <div>
-              <strong>{featuredChart.title}</strong>
-              <span>{featuredChart.subtitle}</span>
-            </div>
-            <div className="chart-actions no-print">
-              <ChartTypeControl
-                activeType={chartTypes[featuredChart.id] ?? featuredChart.type}
-                availableTypes={featuredChart.available_types ?? [featuredChart.type]}
-                onChange={(type) => setChartTypes((current) => ({ ...current, [featuredChart.id]: type }))}
-              />
-            </div>
+        <div className="dashboard-chart-section">
+          <div className="dashboard-chart-section-heading">
+            <span>Grafico principal</span>
+            <strong>Comece por aqui</strong>
           </div>
-          <ChartRenderer
-            chart={{ ...featuredChart, type: chartTypes[featuredChart.id] ?? featuredChart.type }}
-            colors={theme.series}
-            height={330}
-          />
-          <p>{featuredChart.insight}</p>
-        </article>
+          <article className="dashboard-chart-card dashboard-featured-chart">
+            <div className="chart-card-heading">
+              <div>
+                <strong>{featuredChart.title}</strong>
+                <span>{featuredChart.subtitle}</span>
+              </div>
+              <div className="chart-actions no-print">
+                <ChartTypeControl
+                  activeType={chartTypes[featuredChart.id] ?? featuredChart.type}
+                  availableTypes={featuredChart.available_types ?? [featuredChart.type]}
+                  onChange={(type) => setChartTypes((current) => ({ ...current, [featuredChart.id]: type }))}
+                />
+              </div>
+            </div>
+            <ChartRenderer
+              chart={{ ...featuredChart, type: chartTypes[featuredChart.id] ?? featuredChart.type }}
+              colors={theme.series}
+              height={330}
+            />
+            <p>{featuredChart.insight}</p>
+          </article>
+        </div>
       ) : null}
 
-      <div className="dashboard-chart-grid">
-        {secondaryCharts.map((chart) => {
-          const selectedType = chartTypes[chart.id] ?? chart.type;
-          return (
-            <article className="dashboard-chart-card" key={chart.id}>
-              <div className="chart-card-heading">
-                <div>
-                  <strong>{chart.title}</strong>
-                  <span>{chart.subtitle}</span>
-                </div>
-                <div className="chart-actions no-print">
-                  <ChartTypeControl
-                    activeType={selectedType}
-                    availableTypes={chart.available_types ?? [chart.type]}
-                    onChange={(type) => setChartTypes((current) => ({ ...current, [chart.id]: type }))}
-                  />
-                  <button aria-label="Mover grafico para cima" onClick={() => moveChart(chart.id, -1)} type="button">
-                    <ArrowUp size={15} />
-                  </button>
-                  <button aria-label="Mover grafico para baixo" onClick={() => moveChart(chart.id, 1)} type="button">
-                    <ArrowDown size={15} />
-                  </button>
-                  <button aria-label="Ocultar grafico" onClick={() => hideChart(chart.id)} type="button">
-                    <EyeOff size={15} />
-                  </button>
-                </div>
-              </div>
-              <ChartRenderer chart={{ ...chart, type: selectedType }} colors={theme.series} height={230} />
-              <p>{chart.insight}</p>
-            </article>
-          );
-        })}
-      </div>
+      {secondaryCharts.length ? (
+        <div className="dashboard-chart-section">
+          <div className="dashboard-chart-section-heading">
+            <span>Graficos de apoio</span>
+            <strong>Compare rankings, qualidade e distribuicoes</strong>
+          </div>
+          <div className="dashboard-chart-grid">
+            {secondaryCharts.map((chart) => {
+              const selectedType = chartTypes[chart.id] ?? chart.type;
+              return (
+                <article className="dashboard-chart-card" key={chart.id}>
+                  <div className="chart-card-heading">
+                    <div>
+                      <strong>{chart.title}</strong>
+                      <span>{chart.subtitle}</span>
+                    </div>
+                    <div className="chart-actions no-print">
+                      <ChartTypeControl
+                        activeType={selectedType}
+                        availableTypes={chart.available_types ?? [chart.type]}
+                        onChange={(type) => setChartTypes((current) => ({ ...current, [chart.id]: type }))}
+                      />
+                      <button aria-label="Mover grafico para cima" onClick={() => moveChart(chart.id, -1)} type="button">
+                        <ArrowUp size={15} />
+                      </button>
+                      <button aria-label="Mover grafico para baixo" onClick={() => moveChart(chart.id, 1)} type="button">
+                        <ArrowDown size={15} />
+                      </button>
+                      <button aria-label="Ocultar grafico" onClick={() => hideChart(chart.id)} type="button">
+                        <EyeOff size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  <ChartRenderer chart={{ ...chart, type: selectedType }} colors={theme.series} height={230} />
+                  <p>{chart.insight}</p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {hiddenCharts.size ? (
         <div className="hidden-chart-list no-print">

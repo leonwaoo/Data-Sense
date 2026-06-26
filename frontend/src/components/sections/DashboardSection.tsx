@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, FileImage, LayoutDashboard, Printer, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, FileImage, LayoutDashboard, Printer, SlidersHorizontal, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { dashboardThemeMap } from "../../constants";
@@ -47,6 +47,8 @@ export function DashboardSection({
     const missing = dashboard.charts.filter((chart) => !chartOrder.includes(chart.id));
     return [...ordered, ...missing].filter((chart) => !hiddenCharts.has(chart.id));
   }, [chartOrder, dashboard, hiddenCharts]);
+  const featuredChart = orderedCharts[0] ?? null;
+  const secondaryCharts = orderedCharts.slice(1);
 
   function moveChart(chartId: string, direction: -1 | 1) {
     setChartOrder((current) => {
@@ -123,34 +125,65 @@ export function DashboardSection({
           {settings.logoDataUrl ? <img alt="" className="dashboard-logo" src={settings.logoDataUrl} /> : <LayoutDashboard size={22} />}
           <div>
             <h2>{settings.title || "Graficos do arquivo"}</h2>
-            <span>Use os filtros para explorar visualmente, sem mexer nos detalhes tecnicos</span>
+            <span>Uma visao limpa para acompanhar os principais movimentos</span>
           </div>
         </div>
         <span className="domain-pill">{dashboard.domain.label}</span>
       </div>
 
-      <div className="dashboard-toolbox no-print">
-        <DashboardCustomization settings={settings} onSettingsChange={onSettingsChange} />
-        <DashboardFiltersPanel
-          controls={dashboard.filters}
-          filters={filters}
-          onApply={onApplyFilters}
-          onReset={onResetFilters}
-        />
-        <div className="dashboard-export-actions">
-          <button onClick={handlePrintDashboard} type="button">
-            <Printer size={16} />
-            Exportar PDF
-          </button>
-          <button disabled={!!isExportingDashboard} onClick={() => void handleExportDashboardPng()} type="button">
-            <FileImage size={16} />
-            {isExportingDashboard ? "Gerando PNG..." : "Exportar PNG"}
-          </button>
+      <details className="dashboard-controls no-print">
+        <summary>
+          <SlidersHorizontal size={16} />
+          Ajustes e filtros
+          {dashboard.filters.applied_count ? <span>{dashboard.filters.applied_count}</span> : null}
+        </summary>
+        <div className="dashboard-toolbox">
+          <DashboardCustomization settings={settings} onSettingsChange={onSettingsChange} />
+          <DashboardFiltersPanel
+            controls={dashboard.filters}
+            filters={filters}
+            onApply={onApplyFilters}
+            onReset={onResetFilters}
+          />
+          <div className="dashboard-export-actions">
+            <button onClick={handlePrintDashboard} type="button">
+              <Printer size={16} />
+              Exportar PDF
+            </button>
+            <button disabled={!!isExportingDashboard} onClick={() => void handleExportDashboardPng()} type="button">
+              <FileImage size={16} />
+              {isExportingDashboard ? "Gerando PNG..." : "Exportar PNG"}
+            </button>
+          </div>
         </div>
-      </div>
+      </details>
+
+      {featuredChart ? (
+        <article className="dashboard-chart-card dashboard-featured-chart">
+          <div className="chart-card-heading">
+            <div>
+              <strong>{featuredChart.title}</strong>
+              <span>{featuredChart.subtitle}</span>
+            </div>
+            <div className="chart-actions no-print">
+              <ChartTypeControl
+                activeType={chartTypes[featuredChart.id] ?? featuredChart.type}
+                availableTypes={featuredChart.available_types ?? [featuredChart.type]}
+                onChange={(type) => setChartTypes((current) => ({ ...current, [featuredChart.id]: type }))}
+              />
+            </div>
+          </div>
+          <ChartRenderer
+            chart={{ ...featuredChart, type: chartTypes[featuredChart.id] ?? featuredChart.type }}
+            colors={theme.series}
+            height={330}
+          />
+          <p>{featuredChart.insight}</p>
+        </article>
+      ) : null}
 
       <div className="dashboard-chart-grid">
-        {orderedCharts.map((chart) => {
+        {secondaryCharts.map((chart) => {
           const selectedType = chartTypes[chart.id] ?? chart.type;
           return (
             <article className="dashboard-chart-card" key={chart.id}>
@@ -176,7 +209,7 @@ export function DashboardSection({
                   </button>
                 </div>
               </div>
-              <ChartRenderer chart={{ ...chart, type: selectedType }} colors={theme.series} height={250} />
+              <ChartRenderer chart={{ ...chart, type: selectedType }} colors={theme.series} height={230} />
               <p>{chart.insight}</p>
             </article>
           );

@@ -39,10 +39,8 @@ export function DashboardFiltersPanel({
     <div className="toolbox-block dashboard-filter-block">
       <div className="toolbox-title">
         <Filter size={17} />
-        <strong>Filtros</strong>
-        <small>
-          {controls.rows_after_filter.toLocaleString("pt-BR")} / {controls.rows_before_filter.toLocaleString("pt-BR")} linhas
-        </small>
+        <strong>Filtrar visualizacao</strong>
+        <small>{controls.applied_count ? `${controls.applied_count} ativo(s)` : "sem filtros"}</small>
       </div>
 
       {controls.date ? (
@@ -95,7 +93,7 @@ export function DashboardFiltersPanel({
 
       <div className="filter-actions">
         <button onClick={() => onApply(cleanFilters(draft))} type="button">
-          Aplicar filtros
+          Aplicar
         </button>
         <button onClick={onReset} type="button">
           <RotateCcw size={15} />

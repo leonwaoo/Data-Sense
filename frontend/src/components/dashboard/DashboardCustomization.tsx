@@ -22,17 +22,17 @@ export function DashboardCustomization({
     <div className="toolbox-block">
       <div className="toolbox-title">
         <Palette size={17} />
-        <strong>Personalizacao</strong>
+        <strong>Aparencia</strong>
       </div>
       <label>
-        <span>Titulo</span>
+        <span>Nome do dashboard</span>
         <input
           value={settings.title}
           onChange={(event) => onSettingsChange((current) => ({ ...current, title: event.target.value }))}
         />
       </label>
       <label>
-        <span>Tema</span>
+        <span>Cores</span>
         <select
           value={settings.theme}
           onChange={(event) =>

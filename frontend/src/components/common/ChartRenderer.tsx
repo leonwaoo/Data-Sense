@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ChartPayload } from "../../types";
+import type { ChartPayload, ChartPointSelection } from "../../types";
 
 type ChartDatum = Record<string, string | number>;
 
@@ -54,6 +54,24 @@ function lineFocus(data: ChartDatum[], chart: ChartPayload) {
   return data.length ? data[data.length - 1] : null;
 }
 
+function buildSelection(chart: ChartPayload, datum: ChartDatum | undefined): ChartPointSelection | null {
+  if (!datum) return null;
+  const label = labelOf(datum, chart.x);
+  return {
+    chartId: chart.id,
+    x: chart.x,
+    y: chart.y,
+    label,
+    value: valueOf(datum, chart.y),
+    datum,
+  };
+}
+
+function activeSelection(chart: ChartPayload, state: unknown): ChartPointSelection | null {
+  const payload = state as { activePayload?: { payload?: ChartDatum }[] };
+  return buildSelection(chart, payload.activePayload?.[0]?.payload);
+}
+
 function CustomTooltip({ active, label, payload }: { active?: boolean; label?: string; payload?: { value?: string | number }[] }) {
   if (!active || !payload?.length) return null;
   return (
@@ -81,10 +99,12 @@ export function ChartRenderer({
   chart,
   colors,
   height,
+  onSelect,
 }: {
   chart: ChartPayload;
   colors: string[];
   height: number;
+  onSelect?: (selection: ChartPointSelection) => void;
 }) {
   const data = sortedData(chart);
   const primary = colors[0] ?? "#0f766e";
@@ -101,7 +121,14 @@ export function ChartRenderer({
     return (
       <div className="chart-frame chart-frame-area">
         <ResponsiveContainer height={height} width="100%">
-          <AreaChart data={data} margin={{ bottom: 4, left: 0, right: 24, top: 16 }}>
+          <AreaChart
+            data={data}
+            margin={{ bottom: 4, left: 0, right: 24, top: 16 }}
+            onClick={(state) => {
+              const selection = activeSelection(chart, state);
+              if (selection) onSelect?.(selection);
+            }}
+          >
             <defs>
               <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
                 <stop offset="0%" stopColor={primary} stopOpacity={0.28} />
@@ -113,7 +140,7 @@ export function ChartRenderer({
             <YAxis axisLine={false} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickFormatter={formatValue} tickLine={false} width={42} />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--chart-cursor)", strokeWidth: 1 }} />
             <Area dataKey={chart.y} fill={`url(#${gradientId})`} stroke={primary} strokeWidth={3} type="monotone" />
-            {focus ? <ReferenceDot fill={primary} r={5} stroke="#fff" strokeWidth={2} x={focus[chart.x]} y={focus[chart.y]} /> : null}
+            {focus ? <ReferenceDot className="chart-attention-dot" fill={primary} r={5} stroke="#fff" strokeWidth={2} x={focus[chart.x]} y={focus[chart.y]} /> : null}
           </AreaChart>
         </ResponsiveContainer>
         {focus ? (
@@ -130,13 +157,20 @@ export function ChartRenderer({
     return (
       <div className="chart-frame chart-frame-line">
         <ResponsiveContainer height={height} width="100%">
-          <LineChart data={data} margin={{ bottom: 4, left: 0, right: 24, top: 16 }}>
+          <LineChart
+            data={data}
+            margin={{ bottom: 4, left: 0, right: 24, top: 16 }}
+            onClick={(state) => {
+              const selection = activeSelection(chart, state);
+              if (selection) onSelect?.(selection);
+            }}
+          >
             <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
             <XAxis axisLine={false} dataKey={chart.x} minTickGap={20} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickLine={false} />
             <YAxis axisLine={false} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickFormatter={formatValue} tickLine={false} width={42} />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--chart-cursor)", strokeWidth: 1 }} />
             <Line activeDot={{ fill: primary, r: 6, stroke: "#fff", strokeWidth: 2 }} dataKey={chart.y} dot={false} stroke={primary} strokeWidth={3} type="monotone" />
-            {focus ? <ReferenceDot fill={primary} r={5} stroke="#fff" strokeWidth={2} x={focus[chart.x]} y={focus[chart.y]} /> : null}
+            {focus ? <ReferenceDot className="chart-attention-dot" fill={primary} r={5} stroke="#fff" strokeWidth={2} x={focus[chart.x]} y={focus[chart.y]} /> : null}
           </LineChart>
         </ResponsiveContainer>
         {focus ? (
@@ -165,6 +199,11 @@ export function ChartRenderer({
               nameKey={chart.x}
               outerRadius="82%"
               paddingAngle={2}
+              onClick={(datum) => {
+                const pieDatum = datum as ChartDatum & { payload?: ChartDatum };
+                const selection = buildSelection(chart, pieDatum.payload ?? pieDatum);
+                if (selection) onSelect?.(selection);
+              }}
             >
               {data.map((_, index) => (
                 <Cell fill={colors[index % colors.length]} key={index} stroke="#fff" strokeWidth={2} />
@@ -193,7 +232,15 @@ export function ChartRenderer({
   return (
     <div className="chart-frame chart-frame-bar">
       <ResponsiveContainer height={height} width="100%">
-        <BarChart data={data} layout="vertical" margin={{ bottom: 4, left: 8, right: 48, top: 8 }}>
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ bottom: 4, left: 8, right: 48, top: 8 }}
+          onClick={(state) => {
+            const selection = activeSelection(chart, state);
+            if (selection) onSelect?.(selection);
+          }}
+        >
           <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
           <XAxis axisLine={false} tick={{ fill: "var(--chart-muted)", fontSize: 11 }} tickFormatter={formatValue} tickLine={false} type="number" />
           <YAxis
@@ -209,7 +256,7 @@ export function ChartRenderer({
           <Bar background={{ fill: "var(--chart-track)" }} dataKey={chart.y} fill={primary} radius={[0, 8, 8, 0]}>
             <LabelList content={BarValueLabel} dataKey={chart.y} />
             {data.map((_, index) => (
-              <Cell fill={index === 0 ? primary : comparison} fillOpacity={index === 0 ? 1 : 0.72} key={index} />
+              <Cell className={index === 0 ? "chart-bar-priority" : undefined} fill={index === 0 ? primary : comparison} fillOpacity={index === 0 ? 1 : 0.72} key={index} />
             ))}
           </Bar>
         </BarChart>

@@ -60,10 +60,22 @@ export type Quality = {
 };
 
 export type ChartPayload = {
+  id?: string;
   type: string;
   x: string;
   y: string;
   data: Record<string, string | number>[];
+  filter_column?: string;
+  period_grain?: "month" | string;
+};
+
+export type ChartPointSelection = {
+  chartId?: string;
+  x: string;
+  y: string;
+  label: string;
+  value: number;
+  datum: Record<string, string | number>;
 };
 
 export type Answer = {

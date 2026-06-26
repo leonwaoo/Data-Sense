@@ -9,7 +9,7 @@ export async function exportDashboardAsPng(
 ) {
   const width = 1400;
   const chartRows = Math.ceil(Math.min(charts.length, 4) / 2);
-  const height = 470 + chartRows * 300 + Math.ceil(dashboard.insights.length / 2) * 54;
+  const height = 620 + chartRows * 300 + Math.ceil(dashboard.insights.length / 2) * 54;
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -40,8 +40,31 @@ export async function exportDashboardAsPng(
   drawWrappedText(context, dashboard.subtitle, 150, 116, 980, 24);
   drawPill(context, dashboard.domain.label, width - 305, 70, 230, theme.accent, theme.soft);
 
-  let x = 70;
-  let y = 170;
+  let y = 160;
+  drawRoundRect(context, 70, y, 760, 92, 16, theme.soft, "#dbe5ef");
+  context.fillStyle = theme.accent;
+  context.font = "800 15px Arial";
+  context.fillText("Resumo executivo", 92, y + 28);
+  context.fillStyle = "#0f172a";
+  context.font = "800 20px Arial";
+  drawWrappedText(context, dashboard.insights[0] || "Arquivo pronto para exploracao visual.", 92, y + 58, 700, 24);
+  drawRoundRect(context, 860, y, 200, 92, 16, "#f8fafc", "#dbe5ef");
+  context.fillStyle = "#64748b";
+  context.font = "800 13px Arial";
+  context.fillText("Linhas analisadas", 880, y + 30);
+  context.fillStyle = "#0f172a";
+  context.font = "800 24px Arial";
+  context.fillText(dashboard.filters.rows_after_filter.toLocaleString("pt-BR"), 880, y + 64);
+  drawRoundRect(context, 1085, y, 210, 92, 16, "#f8fafc", "#dbe5ef");
+  context.fillStyle = "#64748b";
+  context.font = "800 13px Arial";
+  context.fillText("Graficos ativos", 1105, y + 30);
+  context.fillStyle = "#0f172a";
+  context.font = "800 24px Arial";
+  context.fillText(String(charts.length), 1105, y + 64);
+
+  y = 285;
+  const x = 70;
   const kpiWidth = 196;
   dashboard.kpis.slice(0, 6).forEach((kpi, index) => {
     const cardX = x + index * (kpiWidth + 14);
@@ -57,7 +80,7 @@ export async function exportDashboardAsPng(
     drawWrappedText(context, kpi.detail, cardX + 16, y + 90, kpiWidth - 32, 16);
   });
 
-  y = 330;
+  y = 430;
   charts.slice(0, 4).forEach((chart, index) => {
     const chartX = 70 + (index % 2) * 630;
     const chartY = y + Math.floor(index / 2) * 300;
@@ -74,7 +97,7 @@ export async function exportDashboardAsPng(
   const insightY = y + chartRows * 300 + 8;
   context.fillStyle = "#0f172a";
   context.font = "800 21px Arial";
-  context.fillText("Principais leituras", 70, insightY);
+  context.fillText("Alertas e proximas leituras", 70, insightY);
   dashboard.insights.slice(0, 6).forEach((insight, index) => {
     const chipX = 70 + (index % 2) * 630;
     const chipY = insightY + 26 + Math.floor(index / 2) * 54;
@@ -144,14 +167,23 @@ function drawCanvasChart(
     return;
   }
 
-  const barWidth = width / Math.max(data.length, 1) - 8;
-  const baseline = valueToY(0);
-  values.forEach((value, index) => {
-    const valueY = valueToY(value);
-    const barTop = Math.min(baseline, valueY);
-    const barHeight = Math.max(Math.abs(valueY - baseline), 2);
-    context.fillStyle = colors[index % colors.length];
-    context.fillRect(x + index * (barWidth + 8), barTop, Math.max(barWidth, 8), barHeight);
+  const sorted = data
+    .map((row, index) => ({ row, value: values[index] }))
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value))
+    .slice(0, 6);
+  const maxBar = Math.max(...sorted.map((item) => Math.abs(item.value)), 1);
+  const rowHeight = height / Math.max(sorted.length, 1);
+  sorted.forEach((item, index) => {
+    const label = String(item.row[chart.x] ?? "");
+    const barWidth = (Math.abs(item.value) / maxBar) * (width - 170);
+    const rowY = y + index * rowHeight + 5;
+    context.fillStyle = "#334155";
+    context.font = "700 12px Arial";
+    drawWrappedText(context, label.length > 18 ? `${label.slice(0, 18)}...` : label, x, rowY + 15, 140, 14);
+    context.fillStyle = index === 0 ? colors[0] : colors[1] || colors[0];
+    context.globalAlpha = index === 0 ? 1 : 0.72;
+    context.fillRect(x + 150, rowY, Math.max(barWidth, 4), Math.max(rowHeight - 10, 8));
+    context.globalAlpha = 1;
   });
 }
 

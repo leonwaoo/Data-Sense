@@ -73,21 +73,11 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = height - margin
 
     y = _pdf_header(pdf, context, margin, y, width)
-    y = _pdf_kpi_cards(pdf, context, margin, y, width)
     y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Principais mudancas", _managerial_variation_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Comparativos gerenciais", _managerial_comparative_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Causa raiz", _managerial_root_cause_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Alertas", _managerial_alert_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Recomendacoes", _managerial_recommendation_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Leituras por dimensao", _managerial_dimension_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Comparativo mes a mes", _managerial_monthly_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Insights gerenciais", _managerial_insight_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Resumo do dataset", _summary_items(context), margin, y, width, height)
-    if context.profile.get("date_conversion_suggestions"):
-        y = _pdf_section(pdf, "Sugestoes de conversao de datas", _date_suggestion_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Qualidade dos dados", _quality_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Principais insights", context.insights, margin, y, width, height)
+    y = _pdf_section(pdf, "Alertas", _managerial_alert_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Recomendacoes", context.recommendations, margin, y, width, height)
 
     for chart in context.charts:
@@ -97,6 +87,10 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
             pdf.showPage()
             y = height - margin
         y = _pdf_chart(pdf, chart, margin, y, width)
+
+    y = _pdf_section(pdf, "Detalhes tecnicos", _technical_detail_items(context), margin, y, width, height)
+    if context.profile.get("date_conversion_suggestions"):
+        y = _pdf_section(pdf, "Sugestoes de conversao de datas", _date_suggestion_items(context), margin, y, width, height)
 
     _pdf_footer(pdf, width)
     pdf.save()
@@ -140,26 +134,19 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     draw.text((x + 28, y + 164), f"Gerado em: {context.generated_at}", fill="#64748b", font=fonts["small"])
     y += 250
 
-    _png_kpi_cards(draw, context, fonts, x, y)
-    y += 150
     y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Principais mudancas", _managerial_variation_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Comparativos gerenciais", _managerial_comparative_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Causa raiz", _managerial_root_cause_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Alertas", _managerial_alert_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Recomendacoes", _managerial_recommendation_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Leituras por dimensao", _managerial_dimension_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Comparativo mes a mes", _managerial_monthly_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Insights gerenciais", _managerial_insight_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Resumo do dataset", _summary_items(context), fonts, x, y, max_width)
-    if context.profile.get("date_conversion_suggestions"):
-        y = _png_section(draw, "Sugestoes de conversao de datas", _date_suggestion_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Qualidade dos dados", _quality_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Principais insights", context.insights, fonts, x, y, max_width)
+    y = _png_section(draw, "Alertas", _managerial_alert_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Recomendacoes", context.recommendations, fonts, x, y, max_width)
 
     for chart in context.charts:
         y = _png_chart(draw, chart, fonts, x, y, max_width)
+
+    y = _png_section(draw, "Detalhes tecnicos", _technical_detail_items(context), fonts, x, y, max_width)
+    if context.profile.get("date_conversion_suggestions"):
+        y = _png_section(draw, "Sugestoes de conversao de datas", _date_suggestion_items(context), fonts, x, y, max_width)
 
     cropped = image.crop((0, 0, 1400, min(image.height, y + 70)))
     output = BytesIO()
@@ -192,55 +179,23 @@ def build_report_context(dataset: DatasetSession) -> ReportContext:
 def _managerial_summary_items(context: ReportContext) -> list[str]:
     analysis = context.managerial_analysis or {}
     summary = [str(item) for item in analysis.get("summary", []) if item]
-    domain = (analysis.get("context") or {}).get("domain") or {}
-    metric_map = (analysis.get("context") or {}).get("metric_map") or {}
-    primary_metric = metric_map.get("primary_metric")
-    confidence = domain.get("confidence")
-    domain_label = domain.get("label")
-
-    items = []
-    if domain_label:
-        confidence_text = f"{int(float(confidence) * 100)}%" if isinstance(confidence, (int, float)) else "n/d"
-        items.append(f"Tipo de analise detectado: {domain_label} com confianca {confidence_text}.")
-    if primary_metric:
-        items.append(f"Metrica principal da leitura gerencial: {primary_metric}.")
-    items.extend(summary[:4])
-    return items or ["Nao houve evidencia suficiente para gerar resumo executivo confiavel."]
+    return summary[:4] or ["Nao houve evidencia suficiente para gerar resumo executivo confiavel."]
 
 
 def _managerial_variation_items(context: ReportContext) -> list[str]:
     analysis = context.managerial_analysis or {}
     variations = analysis.get("variations") or {}
-    context_payload = analysis.get("context") or {}
-    metric_map = context_payload.get("metric_map") or {}
-    time_payload = context_payload.get("time") or {}
-    dimensions = context_payload.get("dimensions") or []
-
     items = []
-    if time_payload.get("label"):
-        items.append(f"Tempo usado na analise: {time_payload['label']}.")
-    if metric_map.get("support_metrics"):
-        support = ", ".join(f"{key}: {value}" for key, value in metric_map["support_metrics"].items())
-        items.append(f"Metricas de apoio usadas como drivers: {support}.")
-    if dimensions:
-        dimension_names = ", ".join(str(item.get("column")) for item in dimensions if item.get("column"))
-        if dimension_names:
-            items.append(f"Dimensoes usadas para localizar onde mudou: {dimension_names}.")
-
     latest = variations.get("latest")
-    increase = variations.get("largest_increase")
     drop = variations.get("largest_drop")
     trend = variations.get("trend") or {}
     if latest:
         items.append(_movement_sentence("Movimento recente", latest))
-    if increase:
-        items.append(_movement_sentence("Maior alta", increase))
     if drop:
         items.append(_movement_sentence("Maior queda", drop))
     if trend:
         items.append(
-            f"Tendencia dos ultimos periodos: {trend.get('direction', 'indefinida')} "
-            f"({_format_signed_number(trend.get('change'))}; {_format_pct(trend.get('change_pct'))})."
+            f"Tendencia geral dos ultimos periodos: {trend.get('direction', 'indefinida')}."
         )
     return items or ["Nao ha variacao temporal suficiente para diagnostico gerencial."]
 
@@ -270,44 +225,51 @@ def _managerial_root_cause_items(context: ReportContext) -> list[str]:
     movement = root_cause.get("movement") or {}
     responsible = root_cause.get("responsible_month") or {}
     primary_contributor = root_cause.get("primary_contributor") or {}
-    waterfall = root_cause.get("waterfall") or {}
     impact_ranking = root_cause.get("dimension_impact_ranking") or []
     concentration_alerts = root_cause.get("concentration_alerts") or []
 
     if movement:
         items.append(
-            f"Movimento principal em {_period_label(root_cause.get('period'))}: {root_cause.get('metric', 'metrica')} saiu de "
-            f"{_format_number(movement.get('previous_value'))} para {_format_number(movement.get('current_value'))}; "
-            f"variacao {_format_signed_number(movement.get('variation'))} ({_format_pct(movement.get('variation_pct'))})."
+            f"O principal movimento ocorreu em {_period_label(root_cause.get('period'))}."
         )
     if primary_contributor:
         items.append(
-            f"Principal contribuinte: {primary_contributor.get('name')} "
-            f"({_format_signed_number(primary_contributor.get('variation'))}; "
-            f"{_format_pct(primary_contributor.get('share_of_abs_change'))} da mudanca explicada pelos principais recortes)."
-        )
-    if responsible.get("historical_mean") is not None:
-        items.append(
-            f"Comparacao historica: media anterior {_format_number(responsible.get('historical_mean'))}; "
-            f"distancia {_format_signed_number(responsible.get('historical_delta'))}."
+            f"O primeiro ponto para validar e {primary_contributor.get('name')}."
         )
     for item in impact_ranking[:3]:
         items.append(
-            f"Ranking de contribuicao: {item.get('name')} em {item.get('label')} "
-            f"moveu {_format_signed_number(item.get('variation'))} "
-            f"({_format_pct(item.get('share_of_abs_change'))} da variacao absoluta)."
+            f"Tambem merece atencao: {item.get('name')} em {item.get('label')}."
         )
     for alert in concentration_alerts[:2]:
         items.append(f"Concentracao relevante: {alert}")
-    if waterfall.get("steps"):
-        labels = ", ".join(_period_label(step.get("label")) for step in waterfall["steps"][:6] if step.get("label"))
-        items.append(f"Waterfall gerado com os principais passos: {labels}.")
 
     confidence = root_cause.get("confidence")
     recommendation = root_cause.get("recommendation")
     if confidence or recommendation:
         items.append(f"Confianca: {confidence or 'n/d'}. Recomendacao: {recommendation or 'validar evidencias principais'}.")
     return items[:10] or ["Sem causa raiz suficiente para exportacao nesta base."]
+
+
+def _technical_detail_items(context: ReportContext) -> list[str]:
+    profile = context.profile
+    quality = context.quality
+    analysis = context.managerial_analysis or {}
+    context_payload = analysis.get("context") or {}
+    metric_map = context_payload.get("metric_map") or {}
+    time_payload = context_payload.get("time") or {}
+    items = [
+        f"Arquivo: {context.file_name}.",
+        f"Estrutura: {profile['rows']} linhas e {profile['columns']} colunas.",
+        f"Qualidade: score {quality.get('score')}/100, {quality.get('missing_total')} nulos e {quality.get('duplicate_rows')} duplicatas.",
+    ]
+    if metric_map.get("primary_metric"):
+        items.append(f"Metrica principal usada pelo motor: {metric_map.get('primary_metric')}.")
+    if time_payload.get("label"):
+        items.append(f"Periodo usado pelo motor: {time_payload.get('label')}.")
+    if metric_map.get("support_metrics"):
+        support = ", ".join(str(value) for value in metric_map["support_metrics"].values())
+        items.append(f"Metricas de apoio: {support}.")
+    return items
 
 
 def _managerial_dimension_items(context: ReportContext) -> list[str]:
@@ -379,14 +341,11 @@ def _managerial_recommendation_items(context: ReportContext) -> list[str]:
 
 def _movement_sentence(label: str, movement: dict) -> str:
     period = _period_label(movement.get("period"))
-    value = _format_number(movement.get("value"))
     variation = _format_signed_number(movement.get("variation"))
     variation_pct = _format_pct(movement.get("variation_pct"))
-    historical_mean = _format_number(movement.get("historical_mean"))
-    z_score = _format_number(movement.get("z_score"))
+    direction = "subiu" if (_safe_float(movement.get("variation")) or 0) > 0 else "caiu" if (_safe_float(movement.get("variation")) or 0) < 0 else "ficou estavel"
     return (
-        f"{label}: {period} com valor {value}, variacao {variation} ({variation_pct}), "
-        f"media historica {historical_mean} e z-score {z_score}."
+        f"{label}: em {period}, o indicador {direction} ({variation}, {variation_pct})."
     )
 
 

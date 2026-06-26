@@ -31,10 +31,8 @@ export function ManagerialInsightsSection({
         <div>
           <TrendingUp size={22} />
           <div>
-            <h2>Insights Gerenciais</h2>
-            <span>
-              {analysis.context.domain.label} - {Math.round(analysis.context.domain.confidence * 100)}% de confianca
-            </span>
+            <h2>Diagnostico para decisao</h2>
+            <span>{analysis.context.domain.label}</span>
           </div>
         </div>
         <span className="domain-pill">{analysis.context.domain.label}</span>
@@ -112,7 +110,7 @@ export function ManagerialInsightsSection({
           </div>
         ) : (
           <p className="managerial-ai-empty">
-            Gere uma segunda leitura para transformar as evidencias calculadas em narrativa executiva.
+            Gere uma segunda leitura para transformar os sinais encontrados em uma explicacao executiva.
           </p>
         )}
       </div>
@@ -132,15 +130,13 @@ export function ManagerialInsightsSection({
               <article className="dimension-narrative-card" key={item.dimension}>
                 <div>
                   <strong>{item.label}</strong>
-                  <span>{item.share_concentration.level} concentracao</span>
+                  <span>{item.share_concentration.level} prioridade</span>
                 </div>
                 <p>{item.narrative}</p>
                 <small>{item.managerial_impact}</small>
                 <div className="dimension-narrative-movers">
                   {(item.top_movers ?? []).slice(0, 3).map((mover) => (
-                    <span key={`${item.dimension}-${mover.name}`}>
-                      {mover.name}: {mover.variation ?? 0}
-                    </span>
+                    <span key={`${item.dimension}-${mover.name}`}>{mover.name}</span>
                   ))}
                 </div>
                 {item.recommendation ? <footer>{item.recommendation}</footer> : null}
@@ -150,51 +146,24 @@ export function ManagerialInsightsSection({
         </div>
       ) : null}
 
-      <div className="managerial-section-heading">
-        <strong>Alertas e recomendacoes</strong>
-        <span>Prioridades para decisao e investigacao</span>
-      </div>
-
-      <div className="managerial-insight-grid">
-        {analysis.insights.slice(0, 4).map((insight) => (
-          <article className={`managerial-insight-card severity-${insight.severity}`} key={insight.id}>
-            <div>
-              <strong>{insight.title}</strong>
-              <span>Confianca {insight.confidence}</span>
-            </div>
-            <p>{insight.how_much}</p>
-            <p>{insight.where}</p>
-            <ul>
-              {insight.possible_causes.slice(0, 2).map((cause) => (
-                <li key={cause}>{cause}</li>
-              ))}
-            </ul>
-            <footer>
-              <span>{insight.managerial_impact}</span>
-              <strong>{insight.recommendation}</strong>
-            </footer>
-          </article>
-        ))}
-      </div>
-
       <div className="managerial-bottom-grid">
         <div className="managerial-list managerial-alert-list">
-          <strong>Alertas</strong>
+          <strong>Pontos de atencao</strong>
           {analysis.alerts.slice(0, 3).map((alert) => (
             <article key={alert}>
-              <span>Alerta automatico</span>
+              <span>Validar</span>
               <p>{alert}</p>
             </article>
           ))}
         </div>
         <div className="managerial-list">
-          <strong>Recomendacoes</strong>
+          <strong>O que fazer agora</strong>
           {analysis.recommendations.slice(0, 3).map((recommendation) => (
             <p key={recommendation}>{recommendation}</p>
           ))}
         </div>
         <div className="managerial-list">
-          <strong>Perguntas sugeridas</strong>
+          <strong>Perguntas para a equipe</strong>
           {analysis.suggested_questions.slice(0, 4).map((question) => (
             <p key={question}>{question}</p>
           ))}

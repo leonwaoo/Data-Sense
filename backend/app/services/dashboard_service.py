@@ -243,6 +243,7 @@ def _monthly_chart(dataset: DatasetSession, time_context: dict, date_column: str
 
     best = result.sort_values("total", ascending=False).iloc[0]
     movement = _monthly_movement(result)
+    point_insights = _monthly_point_insights(result, metric_column)
     return {
         "chart": {
             "id": "evolucao_mensal",
@@ -255,6 +256,7 @@ def _monthly_chart(dataset: DatasetSession, time_context: dict, date_column: str
             "filter_column": date_column or date_label,
             "period_grain": "month",
             "insight": movement or f"Maior periodo: {best['periodo']} com {_format_number(best['total'])}.",
+            "point_insights": point_insights,
             "available_types": ["line", "area", "bar"],
         },
         "insight": movement or f"Oportunidade: a maior soma mensal de {metric_column} aparece em {best['periodo']}.",
@@ -281,7 +283,8 @@ def _ranking_chart(dataset: DatasetSession, group_column: str, metric_column: st
         return None
 
     top = result.iloc[0]
-    share = float(top["total"] / result["total"].sum()) if float(result["total"].sum()) else 0
+    total_sum = float(result["total"].sum())
+    share = float(top["total"] / total_sum) if total_sum else 0
     return {
         "chart": {
             "id": f"ranking_{_slug(label)}",
@@ -293,6 +296,7 @@ def _ranking_chart(dataset: DatasetSession, group_column: str, metric_column: st
             "data": result.to_dict(orient="records"),
             "filter_column": group_column,
             "insight": f"Principal {label}: {top['grupo']} com {_format_number(top['total'])} ({share:.1%} do top 8).",
+            "point_insights": _ranking_point_insights(result, label, metric_column, "total"),
             "available_types": ["bar", "line", "pie"],
         },
         "insight": f"Oportunidade: {top['grupo']} lidera o ranking por {label} com {share:.1%} do top 8.",
@@ -334,6 +338,7 @@ def _margin_ranking_chart(dataset: DatasetSession, group_column: str, profile_nu
             "data": result.to_dict(orient="records"),
             "filter_column": group_column,
             "insight": f"Maior margem media: {top['grupo']} com {_format_number(top['margem_media'])}.",
+            "point_insights": _ranking_point_insights(result, _display_label(group_column, 32), margin_column, "margem_media", metric_label="margem media"),
             "available_types": ["bar", "line", "pie"],
         },
         "insight": f"Rentabilidade: {top['grupo']} lidera em margem media, mesmo que nao lidere em receita.",
@@ -426,6 +431,88 @@ def _monthly_movement(result: pd.DataFrame) -> str | None:
     variation = (last_total - first_total) / abs(first_total)
     direction = "cresceu" if variation >= 0 else "caiu"
     return f"Tendencia: de {first['periodo']} a {last['periodo']}, o total {direction} {abs(variation):.1%}."
+
+
+def _monthly_point_insights(result: pd.DataFrame, metric_column: str) -> dict[str, dict]:
+    insights: dict[str, dict] = {}
+    rows = result.reset_index(drop=True)
+    for index, row in rows.iterrows():
+        period = str(row["periodo"])
+        value = float(row["total"] or 0)
+        previous_value = float(rows.iloc[index - 1]["total"] or 0) if index > 0 else None
+        variation = value - previous_value if previous_value is not None else None
+        variation_pct = variation / abs(previous_value) if previous_value else None
+        direction = "subiu" if (variation or 0) >= 0 else "caiu"
+        alert = None
+        severity = "neutral"
+        if variation_pct is not None and abs(variation_pct) >= 0.5:
+            alert = f"Movimento forte: {direction} {_format_pct(abs(variation_pct))} contra o mes anterior."
+            severity = "warning" if variation < 0 else "good"
+
+        insights[period] = {
+            "what_changed": f"{period} registrou {_format_number(value)} em {metric_column}.",
+            "how_much": (
+                f"{direction.capitalize()} {_format_signed_number(variation)} contra o mes anterior ({_format_pct(variation_pct)})."
+                if variation is not None
+                else "Este e o primeiro ponto da serie exibida."
+            ),
+            "possible_cause": "Pode refletir sazonalidade, campanha, mudanca de mix, entrada ou saida operacional naquele mes.",
+            "recommendation": "Abrir o mes, comparar produto, cliente, canal e custo, e validar se o movimento foi pontual ou recorrente.",
+            "alert": alert,
+            "severity": severity,
+        }
+    return insights
+
+
+def _ranking_point_insights(
+    result: pd.DataFrame,
+    label: str,
+    metric_column: str,
+    value_column: str,
+    metric_label: str | None = None,
+) -> dict[str, dict]:
+    insights: dict[str, dict] = {}
+    total = float(result[value_column].abs().sum())
+    metric_name = metric_label or metric_column
+    for position, row in result.reset_index(drop=True).iterrows():
+        name = str(row["grupo"])
+        value = float(row[value_column] or 0)
+        share = abs(value) / total if total else 0
+        alert = None
+        severity = "neutral"
+        if share >= 0.8:
+            alert = f"Concentracao alta: {name} representa {_format_pct(share)} do resultado exibido."
+            severity = "warning"
+        elif share >= 0.6:
+            alert = f"Concentracao relevante: {name} representa {_format_pct(share)} do resultado exibido."
+            severity = "warning"
+
+        insights[name] = {
+            "what_changed": f"{name} ocupa a posicao {position + 1} em {label}.",
+            "how_much": f"{metric_name}: {_format_number(value)}; participacao no grafico: {_format_pct(share)}.",
+            "possible_cause": (
+                "A concentracao sugere que este recorte pode estar puxando a leitura geral."
+                if share >= 0.6
+                else "O resultado pode estar ligado a mix, volume, preco, carteira ou comportamento pontual do recorte."
+            ),
+            "recommendation": f"Filtrar {name}, comparar com os demais recortes de {label.lower()} e validar registros que explicam o peso no resultado.",
+            "alert": alert,
+            "severity": severity,
+        }
+    return insights
+
+
+def _format_signed_number(value: float | None) -> str:
+    if value is None:
+        return "n/d"
+    sign = "+" if value >= 0 else "-"
+    return f"{sign}{_format_number(abs(value))}"
+
+
+def _format_pct(value: float | None) -> str:
+    if value is None:
+        return "n/d"
+    return f"{value:.1%}".replace(".", ",")
 
 
 def _apply_filters(

@@ -311,6 +311,7 @@ def test_dashboard_uses_year_month_context_and_margin_ranking() -> None:
 def test_dashboard_uses_fiscal_year_and_hides_null_chart() -> None:
     dashboard = build_dashboard(_fiscal_year_sales_dataset())
     monthly = next(chart for chart in dashboard["charts"] if chart["id"] == "evolucao_mensal")
+    ranking = next(chart for chart in dashboard["charts"] if chart["id"] == "ranking_produto")
 
     periods = [row["periodo"] for row in monthly["data"]]
     chart_ids = {chart["id"] for chart in dashboard["charts"]}
@@ -320,6 +321,10 @@ def test_dashboard_uses_fiscal_year_and_hides_null_chart() -> None:
     assert not any(str(period).startswith("2000-") for period in periods)
     assert "nulos_por_coluna" not in chart_ids
     assert "Valores nulos" not in kpi_labels
+    assert monthly["point_insights"]["2024-12"]["what_changed"]
+    assert monthly["point_insights"]["2024-12"]["recommendation"]
+    assert ranking["point_insights"]["Cafe"]["possible_cause"]
+    assert ranking["point_insights"]["Cafe"]["recommendation"]
 
 
 def test_dashboard_does_not_publish_synthetic_2000_for_month_only_column() -> None:

@@ -83,6 +83,17 @@ export function DashboardSection({
   const totalRows = dashboard?.filters.rows_before_filter ?? 0;
 
   function readSelection(chart: DashboardChart, selection: ChartPointSelection): DrilldownState["reading"] {
+    const pointInsight = chart.point_insights?.[selection.label];
+    if (pointInsight) {
+      return {
+        whatChanged: pointInsight.what_changed,
+        howMuch: pointInsight.how_much,
+        possibleCause: pointInsight.possible_cause,
+        recommendation: pointInsight.recommendation,
+        alert: pointInsight.alert ?? null,
+      };
+    }
+
     const value = selection.value;
     const total = chart.data.reduce((sum, row) => sum + Math.abs(Number(row[chart.y]) || 0), 0);
     const share = total ? Math.abs(value) / total : 0;

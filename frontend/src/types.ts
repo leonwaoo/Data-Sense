@@ -67,6 +67,16 @@ export type ChartPayload = {
   data: Record<string, string | number>[];
   filter_column?: string;
   period_grain?: "month" | string;
+  point_insights?: Record<string, ChartPointInsight>;
+};
+
+export type ChartPointInsight = {
+  what_changed: string;
+  how_much: string;
+  possible_cause: string;
+  recommendation: string;
+  alert?: string | null;
+  severity?: "neutral" | "good" | "warning" | "danger" | string;
 };
 
 export type ChartPointSelection = {

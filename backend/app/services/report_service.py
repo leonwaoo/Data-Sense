@@ -78,7 +78,7 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = _pdf_section(pdf, "Causa raiz", _managerial_root_cause_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Leituras por dimensao", _managerial_dimension_items(context), margin, y, width, height)
     y = _pdf_section(pdf, "Alertas", _managerial_alert_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Recomendacoes", context.recommendations, margin, y, width, height)
+    y = _pdf_section(pdf, "Recomendacoes", _managerial_recommendation_items(context), margin, y, width, height)
 
     for chart in context.charts:
         needed = 96 * mm
@@ -104,13 +104,11 @@ def build_report_png(dataset: DatasetSession) -> bytes:
         for items in [
             _managerial_summary_items(context),
             _managerial_variation_items(context),
-            _managerial_comparative_items(context),
             _managerial_root_cause_items(context),
             _managerial_dimension_items(context),
             _managerial_alert_items(context),
             _managerial_recommendation_items(context),
-            _managerial_monthly_items(context),
-            _managerial_insight_items(context),
+            _technical_detail_items(context),
         ]
     )
     canvas_height = (
@@ -139,7 +137,7 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     y = _png_section(draw, "Causa raiz", _managerial_root_cause_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Leituras por dimensao", _managerial_dimension_items(context), fonts, x, y, max_width)
     y = _png_section(draw, "Alertas", _managerial_alert_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Recomendacoes", context.recommendations, fonts, x, y, max_width)
+    y = _png_section(draw, "Recomendacoes", _managerial_recommendation_items(context), fonts, x, y, max_width)
 
     for chart in context.charts:
         y = _png_chart(draw, chart, fonts, x, y, max_width)
@@ -245,8 +243,8 @@ def _managerial_root_cause_items(context: ReportContext) -> list[str]:
 
     confidence = root_cause.get("confidence")
     recommendation = root_cause.get("recommendation")
-    if confidence or recommendation:
-        items.append(f"Confianca: {confidence or 'n/d'}. Recomendacao: {recommendation or 'validar evidencias principais'}.")
+    if recommendation:
+        items.append(f"Acao recomendada: {recommendation}.")
     return items[:10] or ["Sem causa raiz suficiente para exportacao nesta base."]
 
 
@@ -329,7 +327,7 @@ def _managerial_insight_items(context: ReportContext) -> list[str]:
 
 def _managerial_alert_items(context: ReportContext) -> list[str]:
     analysis = context.managerial_analysis or {}
-    return [f"Alerta: {item}" for item in (analysis.get("alerts") or [])[:5]] or ["Nenhum alerta gerencial adicional foi identificado."]
+    return [f"Validar: {item}" for item in (analysis.get("alerts") or [])[:5]] or ["Nenhum alerta gerencial adicional foi identificado."]
 
 
 def _managerial_recommendation_items(context: ReportContext) -> list[str]:
@@ -341,11 +339,10 @@ def _managerial_recommendation_items(context: ReportContext) -> list[str]:
 
 def _movement_sentence(label: str, movement: dict) -> str:
     period = _period_label(movement.get("period"))
-    variation = _format_signed_number(movement.get("variation"))
-    variation_pct = _format_pct(movement.get("variation_pct"))
-    direction = "subiu" if (_safe_float(movement.get("variation")) or 0) > 0 else "caiu" if (_safe_float(movement.get("variation")) or 0) < 0 else "ficou estavel"
+    variation = _report_float(movement.get("variation")) or 0
+    direction = "subiu" if variation > 0 else "caiu" if variation < 0 else "ficou estavel"
     return (
-        f"{label}: em {period}, o indicador {direction} ({variation}, {variation_pct})."
+        f"{label}: em {period}, o indicador {direction}. Os valores detalhados ficam em Detalhes tecnicos."
     )
 
 
@@ -892,6 +889,14 @@ def _format_signed_number(value: object) -> str:
         return "n/d"
     sign = "+" if parsed >= 0 else "-"
     return f"{sign}{_format_number(abs(parsed))}"
+
+
+def _report_float(value: object) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if pd.notna(parsed) else None
 
 
 def _format_pct(value: object) -> str:

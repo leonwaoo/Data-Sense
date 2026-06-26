@@ -21,6 +21,8 @@ export function ManagerialInsightsSection({
 }: ManagerialInsightsSectionProps) {
   const rootCause = analysis.root_cause_analysis ?? null;
   const dimensionNarratives = analysis.dimension_narratives ?? rootCause?.dimension_narratives ?? [];
+  const comparativeCards = analysis.comparative_summary?.cards ?? [];
+  const comparativeReadings = analysis.comparative_summary?.readings ?? [];
   const aiStatusLabel = aiReview?.ai_status === "completed"
     ? `IA ${aiReview.model ?? "ativa"}`
     : aiReview?.ai_status === "not_configured"
@@ -51,6 +53,33 @@ export function ManagerialInsightsSection({
           <p key={item}>{item}</p>
         ))}
       </div>
+
+      {comparativeCards.length || comparativeReadings.length ? (
+        <div className="managerial-comparative-panel">
+          <div className="managerial-section-heading">
+            <strong>Comparativos gerenciais</strong>
+            <span>Mes contra mes, acumulado, media movel e pontos fora do padrao</span>
+          </div>
+          {comparativeCards.length ? (
+            <div className="managerial-comparative-cards">
+              {comparativeCards.slice(0, 4).map((card) => (
+                <article className={`comparison-tone-${card.tone ?? "neutral"}`} key={`${card.label}-${card.value}`}>
+                  <span>{card.label}</span>
+                  <strong>{card.value}</strong>
+                  <small>{card.detail}</small>
+                </article>
+              ))}
+            </div>
+          ) : null}
+          {comparativeReadings.length ? (
+            <div className="managerial-comparative-readings">
+              {comparativeReadings.slice(0, 3).map((reading) => (
+                <p key={reading}>{reading}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="managerial-ai-panel">
         <div className="managerial-ai-heading">
@@ -161,6 +190,15 @@ export function ManagerialInsightsSection({
                     <span key={`${item.dimension}-${mover.name}`}>{mover.name}</span>
                   ))}
                 </div>
+                {(item.top_movers?.[0]?.context ?? []).length ? (
+                  <div className="dimension-narrative-context">
+                    {(item.top_movers?.[0]?.context ?? []).slice(0, 3).map((context) => (
+                      <span key={`${item.dimension}-${context.dimension}-${context.name}`}>
+                        {context.dimension}: <strong>{context.name}</strong>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 {item.recommendation ? <footer>{item.recommendation}</footer> : null}
               </article>
             ))}

@@ -158,6 +158,11 @@ export type RootCauseContributor = {
   historical_delta?: number | null;
   concentration_level?: "alta" | "media" | "baixa" | string;
   recurrence_flag?: "recorrente" | "pontual" | string;
+  context?: {
+    dimension: string;
+    name: string;
+    value: number | null;
+  }[];
 };
 
 export type RootCauseDimensionDriver = {

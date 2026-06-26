@@ -748,6 +748,85 @@
   padding: 4px 10px;
 }
 
+.dimension-narrative-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dimension-narrative-context span {
+  background: var(--accent-soft);
+  border: 1px solid rgba(15, 118, 110, 0.22);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 6px 9px;
+}
+
+.dimension-narrative-context strong {
+  color: var(--accent-strong);
+  font-size: inherit;
+}
+
+.managerial-comparative-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.managerial-comparative-cards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.managerial-comparative-cards article {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+
+.managerial-comparative-cards article.comparison-tone-warning,
+.managerial-comparative-cards article.comparison-tone-danger {
+  border-left-color: #f59e0b;
+}
+
+.managerial-comparative-cards article.comparison-tone-good {
+  border-left-color: #0f766e;
+}
+
+.managerial-comparative-cards span,
+.managerial-comparative-cards small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.managerial-comparative-cards strong {
+  font-size: 1rem;
+}
+
+.managerial-comparative-readings {
+  display: grid;
+  gap: 8px;
+}
+
+.managerial-comparative-readings p {
+  color: var(--text-2);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .managerial-insight-card {
   background: var(--surface-2);
   border: 1px solid var(--border);

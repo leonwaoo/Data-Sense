@@ -2,6 +2,7 @@ import pandas as pd
 
 from app.models import DatasetSession
 from app.services.report_service import (
+    _executive_section_plan,
     _managerial_comparative_items,
     _managerial_dimension_items,
     _managerial_monthly_items,
@@ -50,3 +51,19 @@ def test_report_managerial_items_keep_executive_reading_and_technical_details() 
     assert any("Movimento critico" in item for item in monthly_items)
     assert any("Produto:" in item or "Categoria:" in item for item in dimension_items)
     assert any("linhas" in item and "colunas" in item for item in technical_items)
+
+
+def test_report_section_plan_uses_executive_order() -> None:
+    context = build_report_context(_inventory_dataset())
+
+    titles = [title for title, _items in _executive_section_plan(context)]
+
+    assert titles == [
+        "Resumo executivo",
+        "Principais mudancas",
+        "Comparativos gerenciais",
+        "Causa raiz",
+        "Alertas",
+        "Recomendacoes",
+        "Leituras por dimensao",
+    ]

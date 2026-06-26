@@ -74,12 +74,8 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
     y = height - margin
 
     y = _pdf_header(pdf, context, margin, y, width)
-    y = _pdf_section(pdf, "Resumo executivo", _managerial_summary_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Principais mudancas", _managerial_variation_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Causa raiz", _managerial_root_cause_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Leituras por dimensao", _managerial_dimension_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Alertas", _managerial_alert_items(context), margin, y, width, height)
-    y = _pdf_section(pdf, "Recomendacoes", _managerial_recommendation_items(context), margin, y, width, height)
+    for title, items in _executive_section_plan(context):
+        y = _pdf_section(pdf, title, items, margin, y, width, height)
 
     for chart in context.charts:
         needed = 96 * mm
@@ -89,7 +85,7 @@ def build_report_pdf(dataset: DatasetSession) -> bytes:
             y = height - margin
         y = _pdf_chart(pdf, chart, margin, y, width)
 
-    y = _pdf_section(pdf, "Detalhes tecnicos", _technical_detail_items(context), margin, y, width, height)
+    y = _pdf_section(pdf, "Qualidade dos dados", _technical_detail_items(context), margin, y, width, height)
     if context.profile.get("date_conversion_suggestions"):
         y = _pdf_section(pdf, "Sugestoes de conversao de datas", _date_suggestion_items(context), margin, y, width, height)
 
@@ -105,10 +101,11 @@ def build_report_png(dataset: DatasetSession) -> bytes:
         for items in [
             _managerial_summary_items(context),
             _managerial_variation_items(context),
+            _managerial_comparative_items(context),
             _managerial_root_cause_items(context),
-            _managerial_dimension_items(context),
             _managerial_alert_items(context),
             _managerial_recommendation_items(context),
+            _managerial_dimension_items(context),
             _technical_detail_items(context),
         ]
     )
@@ -133,17 +130,13 @@ def build_report_png(dataset: DatasetSession) -> bytes:
     draw.text((x + 28, y + 164), f"Gerado em: {context.generated_at}", fill="#64748b", font=fonts["small"])
     y += 250
 
-    y = _png_section(draw, "Resumo executivo", _managerial_summary_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Principais mudancas", _managerial_variation_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Causa raiz", _managerial_root_cause_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Leituras por dimensao", _managerial_dimension_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Alertas", _managerial_alert_items(context), fonts, x, y, max_width)
-    y = _png_section(draw, "Recomendacoes", _managerial_recommendation_items(context), fonts, x, y, max_width)
+    for title, items in _executive_section_plan(context):
+        y = _png_section(draw, title, items, fonts, x, y, max_width)
 
     for chart in context.charts:
         y = _png_chart(draw, chart, fonts, x, y, max_width)
 
-    y = _png_section(draw, "Detalhes tecnicos", _technical_detail_items(context), fonts, x, y, max_width)
+    y = _png_section(draw, "Qualidade dos dados", _technical_detail_items(context), fonts, x, y, max_width)
     if context.profile.get("date_conversion_suggestions"):
         y = _png_section(draw, "Sugestoes de conversao de datas", _date_suggestion_items(context), fonts, x, y, max_width)
 
@@ -173,6 +166,18 @@ def build_report_context(dataset: DatasetSession) -> ReportContext:
         charts=charts,
         dashboard_kpis=dashboard.get("kpis", []),
     )
+
+
+def _executive_section_plan(context: ReportContext) -> list[tuple[str, list[str]]]:
+    return [
+        ("Resumo executivo", _managerial_summary_items(context)),
+        ("Principais mudancas", _managerial_variation_items(context)),
+        ("Comparativos gerenciais", _managerial_comparative_items(context)),
+        ("Causa raiz", _managerial_root_cause_items(context)),
+        ("Alertas", _managerial_alert_items(context)),
+        ("Recomendacoes", _managerial_recommendation_items(context)),
+        ("Leituras por dimensao", _managerial_dimension_items(context)),
+    ]
 
 
 def _managerial_summary_items(context: ReportContext) -> list[str]:

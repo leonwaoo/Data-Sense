@@ -34,6 +34,8 @@ def test_powerbi_export_includes_dax_layout_and_indicators() -> None:
         indicators = package.read("indicadores_powerbi.csv").decode("utf-8-sig")
         monthly = package.read("comparativo_mensal.csv").decode("utf-8-sig")
         dimensions = package.read("leituras_dimensao.csv").decode("utf-8-sig")
+        root_cause = package.read("causa_raiz.csv").decode("utf-8-sig")
+        page_model = package.read("modelo_paginas.json").decode("utf-8")
 
     assert {
         "medidas_dax.txt",
@@ -46,7 +48,13 @@ def test_powerbi_export_includes_dax_layout_and_indicators() -> None:
     assert "Media Movel 3M" in dax
     assert "layout_sugerido.csv" in readme
     assert "Leituras por dimensao" in layout
+    assert "checklist_acoes" in layout
     assert "Principal contribuinte" in indicators
     assert "narrativa" in dimensions
+    assert "prioridade" in dimensions
+    assert "pergunta_chave" in dimensions
+    assert "checklist_acoes" in dimensions
+    assert "contexto_cruzado" in root_cause
     assert "media_movel_3m" in monthly
     assert "acumulado_ano" in monthly
+    assert "Plano de acao" in page_model

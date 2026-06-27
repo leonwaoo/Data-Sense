@@ -115,11 +115,12 @@ def _indicator_rows(analysis: dict, quality: dict) -> list[dict]:
             }
         )
     for item in (analysis.get("dimension_narratives") or [])[:3]:
+        priority = item.get("priority") or {}
         rows.append(
             {
                 "indicador": f"Leitura por {item.get('label')}",
                 "valor": (item.get("top_movers") or [{}])[0].get("name"),
-                "detalhe": item.get("managerial_impact"),
+                "detalhe": priority.get("reason") or item.get("managerial_impact"),
                 "pagina_sugerida": "Leituras por dimensao",
             }
         )
@@ -184,8 +185,15 @@ def _layout_rows(analysis: dict, dashboard: dict) -> list[dict]:
             "pagina": "Leituras por dimensao",
             "ordem": 1,
             "visual": "Tabela ou cards de texto",
-            "campos": "leituras_dimensao[dimensao], leituras_dimensao[narrativa], leituras_dimensao[impacto_gerencial]",
-            "objetivo": "Transformar causa raiz em leitura contextualizada por dimensao.",
+            "campos": "leituras_dimensao[dimensao], leituras_dimensao[prioridade], leituras_dimensao[narrativa], leituras_dimensao[pergunta_chave]",
+            "objetivo": "Transformar causa raiz em leitura contextualizada, prioridade e pergunta de validacao.",
+        },
+        {
+            "pagina": "Leituras por dimensao",
+            "ordem": 2,
+            "visual": "Checklist",
+            "campos": "leituras_dimensao[primeira_acao], leituras_dimensao[checklist_acoes]",
+            "objetivo": "Dar o proximo passo pratico para o gestor investigar.",
         },
         {
             "pagina": "Alertas",
@@ -235,6 +243,7 @@ def _page_model(analysis: dict, dashboard: dict) -> dict:
             {"nome": "Comparativos gerenciais", "visuais": ["MoM", "Media movel", "Acumulado YTD", "Melhor e pior mes"]},
             {"nome": "Causa raiz", "visuais": ["Waterfall", "Ranking de contribuicao", "Alertas de concentracao"]},
             {"nome": "Leituras por dimensao", "visuais": ["Narrativas executivas", "Peso relativo", "Historico por dimensao"]},
+            {"nome": "Plano de acao", "visuais": ["Checklist por dimensao", "Perguntas de validacao", "Prioridades"]},
             {"nome": "Alertas", "visuais": ["Cards de alerta", "Concentracoes relevantes"]},
             {"nome": "Recomendacoes", "visuais": ["Acoes sugeridas", "Perguntas sugeridas"]},
             {"nome": "Qualidade dos dados", "visuais": ["Score", "Nulos", "Duplicatas", "Outliers"]},
@@ -278,6 +287,7 @@ def _root_cause_rows(analysis: dict) -> list[dict]:
     for dimension in root_cause.get("dimension_drivers") or []:
         dimension_name = dimension.get("dimension")
         for contributor in dimension.get("contributors") or []:
+            context = contributor.get("context") or []
             rows.append(
                 {
                     "tipo_linha": "contribuinte",
@@ -297,6 +307,7 @@ def _root_cause_rows(analysis: dict) -> list[dict]:
                     "delta_media_historica_entidade": contributor.get("historical_delta"),
                     "concentracao": contributor.get("concentration_level"),
                     "recorrencia": contributor.get("recurrence_flag"),
+                    "contexto_cruzado": _context_text(context),
                     "leitura": next(
                         (
                             item.get("reading")
@@ -344,19 +355,30 @@ def _dimension_narrative_rows(analysis: dict) -> list[dict]:
     for item in analysis.get("dimension_narratives") or []:
         top_movers = item.get("top_movers") or []
         top_names = " | ".join(str(mover.get("name")) for mover in top_movers[:3] if mover.get("name"))
+        priority = item.get("priority") or {}
+        validation_questions = [str(question) for question in item.get("validation_questions") or [] if str(question).strip()]
+        action_checklist = [str(action) for action in item.get("action_checklist") or [] if str(action).strip()]
+        context = (top_movers[0].get("context") if top_movers else []) or []
         rows.append(
             {
                 "dimensao": item.get("dimension"),
                 "rotulo": item.get("label"),
                 "principais_movimentos": top_names,
+                "prioridade": priority.get("level"),
+                "motivo_prioridade": priority.get("reason"),
                 "concentracao_top_1": (item.get("share_concentration") or {}).get("top_1"),
                 "concentracao_top_3": (item.get("share_concentration") or {}).get("top_3"),
                 "nivel_concentracao": (item.get("share_concentration") or {}).get("level"),
                 "media_historica": (item.get("historical_comparison") or {}).get("historical_mean"),
                 "delta_historico": (item.get("historical_comparison") or {}).get("historical_delta"),
+                "contexto_cruzado": _context_text(context),
                 "narrativa": item.get("narrative"),
                 "impacto_gerencial": item.get("managerial_impact"),
                 "possiveis_causas": " | ".join(item.get("possible_causes") or []),
+                "pergunta_chave": validation_questions[0] if validation_questions else None,
+                "perguntas_validacao": " | ".join(validation_questions),
+                "primeira_acao": action_checklist[0] if action_checklist else None,
+                "checklist_acoes": " | ".join(action_checklist),
                 "recomendacao": item.get("recommendation"),
             }
         )
@@ -460,17 +482,18 @@ def _readme_text(dataset: DatasetSession, analysis: dict) -> str:
             "3. Importe comparativo_mensal.csv para criar graficos de evolucao mes a mes.",
             "4. Importe causa_raiz.csv para criar waterfall, ranking de contribuicao e leitura de quem puxou a mudanca.",
             "5. Importe leituras_dimensao.csv para criar a leitura executiva por dimensao.",
-            "6. Importe insights_gerenciais.csv para apoiar alertas, perguntas e recomendacoes.",
-            "7. Use graficos_sugeridos.csv como roteiro para montar visuais equivalentes.",
-            "8. Abra medidas_dax.txt e copie as medidas sugeridas para o modelo.",
-            "9. Use modelo_paginas.json e layout_sugerido.csv como guia de paginas e posicionamento.",
+            "6. Use prioridade, pergunta_chave e checklist_acoes de leituras_dimensao.csv para criar cards de investigacao.",
+            "7. Importe insights_gerenciais.csv para apoiar alertas, perguntas e recomendacoes.",
+            "8. Use graficos_sugeridos.csv como roteiro para montar visuais equivalentes.",
+            "9. Abra medidas_dax.txt e copie as medidas sugeridas para o modelo.",
+            "10. Use modelo_paginas.json e layout_sugerido.csv como guia de paginas e posicionamento.",
             "",
             "Arquivos de apoio:",
             "- medidas_dax.txt: medidas DAX iniciais para total, MoM, acumulado, media movel e participacao.",
             "- modelo_paginas.json: estrutura sugerida de paginas, tabelas e visuais.",
             "- layout_sugerido.csv: roteiro visual com pagina, ordem, campos e objetivo.",
             "- indicadores_powerbi.csv: KPIs prontos para cards executivos.",
-            "- leituras_dimensao.csv: narrativas gerenciais por dimensao relevante.",
+            "- leituras_dimensao.csv: narrativas gerenciais por dimensao relevante, prioridade, perguntas e checklist de acao.",
             "",
             "Graficos recomendados:",
             f"- Linha: periodo x {primary_metric}.",
@@ -478,7 +501,7 @@ def _readme_text(dataset: DatasetSession, analysis: dict) -> str:
             "- Waterfall: causa_raiz.csv filtrado em tipo_linha = waterfall.",
             "- Barras horizontais: causa_raiz.csv filtrado em tipo_linha = contribuinte, entidade x variacao.",
             "- Tabela: periodo, valor, variacao_pct, status, leitura_gerencial.",
-            "- Cards/texto: leituras_dimensao.csv com narrativa, impacto e recomendacao.",
+            "- Cards/texto: leituras_dimensao.csv com prioridade, narrativa, impacto, pergunta_chave e primeira_acao.",
             "- Cartoes: ultimo periodo, maior alta, maior queda, score de qualidade.",
             "",
             "Ordem executiva sugerida: Resumo executivo, Principais mudancas, Comparativos gerenciais, Causa raiz, Leituras por dimensao, Alertas, Recomendacoes e Qualidade dos dados.",
@@ -496,6 +519,14 @@ def _powerbi_visual(chart_type: str | None) -> str:
     if chart_type == "pie":
         return "Grafico de rosca"
     return "Tabela ou grafico automatico"
+
+
+def _context_text(context: list[dict]) -> str:
+    return " | ".join(
+        f"{item.get('dimension')}: {item.get('name')}"
+        for item in context[:3]
+        if item.get("dimension") and item.get("name")
+    )
 
 
 def _period_year(period: str) -> int | None:

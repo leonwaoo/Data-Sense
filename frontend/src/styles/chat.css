@@ -18,7 +18,7 @@
 
 .suggestions button:hover:not(:disabled) {
   background: var(--accent-soft);
-  border-color: #99e6d6;
+  border-color: #b9ccff;
   color: var(--accent-strong);
 }
 

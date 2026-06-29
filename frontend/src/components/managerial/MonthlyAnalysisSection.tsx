@@ -379,22 +379,22 @@ export function MonthlyAnalysisSection({ analysis, onApplyPeriodToDashboard }: M
             <AreaChart data={chartData} margin={{ bottom: 8, left: 0, right: 20, top: 18 }} onClick={handleChartClick}>
               <defs>
                 <linearGradient id="monthlyTrendFill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.26} />
-                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="#1d4ed8" stopOpacity={0.24} />
+                  <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#d7dee9" strokeDasharray="3 3" vertical={false} />
               <XAxis axisLine={false} dataKey="label" tick={{ fill: "#5b657a", fontSize: 12, fontWeight: 700 }} tickLine={false} />
               <YAxis axisLine={false} tick={{ fill: "#5b657a", fontSize: 11 }} tickFormatter={(value) => formatNumberCell(Number(value))} tickLine={false} width={48} />
-              <Tooltip content={<MonthlyTooltip />} cursor={{ stroke: "#0f766e", strokeOpacity: 0.2 }} />
+              <Tooltip content={<MonthlyTooltip />} cursor={{ stroke: "#1d4ed8", strokeOpacity: 0.2 }} />
               <Legend />
-              <ReferenceLine ifOverflow="extendDomain" stroke="#0f766e" strokeDasharray="4 4" strokeOpacity={0.7} x={selectedLabel} />
+              <ReferenceLine ifOverflow="extendDomain" stroke="#1d4ed8" strokeDasharray="4 4" strokeOpacity={0.7} x={selectedLabel} />
               <Area
-                activeDot={{ fill: "#0f766e", r: 7, stroke: "#fff", strokeWidth: 3 }}
+                activeDot={{ fill: "#1d4ed8", r: 7, stroke: "#fff", strokeWidth: 3 }}
                 dataKey="value"
                 fill="url(#monthlyTrendFill)"
                 name={selectedYear}
-                stroke="#0f766e"
+                stroke="#1d4ed8"
                 strokeWidth={3}
                 type="monotone"
               />
@@ -403,7 +403,7 @@ export function MonthlyAnalysisSection({ analysis, onApplyPeriodToDashboard }: M
               {selectedChartPoint ? (
                 <ReferenceDot
                   className="monthly-chart-dot is-selected"
-                  fill="#0f766e"
+                  fill="#1d4ed8"
                   r={6}
                   stroke="#fff"
                   strokeWidth={3}

@@ -107,7 +107,7 @@ export function ChartRenderer({
   onSelect?: (selection: ChartPointSelection) => void;
 }) {
   const data = sortedData(chart);
-  const primary = colors[0] ?? "#0f766e";
+  const primary = colors[0] ?? "#1d4ed8";
   const comparison = colors[1] ?? "#2563eb";
   const focus = lineFocus(data, chart);
   const gradientId = `chart-fill-${chart.x.replace(/\W/g, "")}-${chart.y.replace(/\W/g, "")}`;

@@ -1,10 +1,8 @@
 .panel {
-  backdrop-filter: blur(12px);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 249, 243, 0.92));
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   padding: clamp(18px, 2.4vw, 26px);
 }
 
@@ -35,6 +33,7 @@
 .metric-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   display: flex;
@@ -45,14 +44,14 @@
 }
 
 .metric-card:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+  transform: translateY(-1px);
 }
 
 .metric-card-icon {
   align-items: center;
   background: var(--accent-soft);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   color: var(--accent);
   display: inline-flex;
   height: 38px;
@@ -77,8 +76,9 @@
 
 .insight-strip {
   align-items: center;
-  background: linear-gradient(120deg, var(--accent-soft), var(--surface));
-  border: 1px solid #cdeee6;
+  background: var(--info-soft);
+  border: 1px solid #bfe3f4;
+  border-left: 4px solid var(--info);
   border-radius: var(--radius);
   display: flex;
   gap: 16px;
@@ -95,19 +95,17 @@
 }
 
 .insight-strip svg {
-  color: var(--accent);
+  color: var(--info);
 }
 
 .insight-strip strong {
-  color: var(--accent-strong);
+  color: var(--info);
   font-size: 0.86rem;
   white-space: nowrap;
 }
 
 .executive-home {
-  background:
-    radial-gradient(circle at top right, rgba(15, 118, 110, 0.09), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 246, 239, 0.92));
+  border-top: 4px solid var(--accent);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -152,7 +150,7 @@
 }
 
 .executive-context-strip span {
-  background: rgba(255, 255, 255, 0.84);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--text-2);
@@ -168,20 +166,37 @@
 }
 
 .executive-card-grid article {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(246, 248, 244, 0.95));
+  --indicator: var(--accent);
+  background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--indicator);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 190px;
+  min-height: 168px;
   padding: 18px;
 }
 
+.executive-card-grid article:nth-child(1) {
+  --indicator: var(--info);
+}
+
+.executive-card-grid article:nth-child(2) {
+  --indicator: var(--danger);
+}
+
+.executive-card-grid article:nth-child(3) {
+  --indicator: var(--success);
+}
+
+.executive-card-grid article:nth-child(4) {
+  --indicator: var(--accent);
+}
+
 .executive-card-grid svg {
-  color: var(--accent);
+  color: var(--indicator);
 }
 
 .executive-card-grid span {
@@ -208,7 +223,7 @@
 }
 
 .executive-next-steps article {
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   display: grid;

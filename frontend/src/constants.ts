@@ -14,28 +14,28 @@ export const dashboardThemeMap: Record<
   { label: string; accent: string; soft: string; series: string[] }
 > = {
   teal: {
-    label: "Verde",
-    accent: "#0f766e",
-    soft: "#ecfdf5",
-    series: ["#0f766e", "#2563eb", "#d97706", "#7c3aed", "#be123c", "#15803d"],
+    label: "Executivo",
+    accent: "#1d4ed8",
+    soft: "#e8f0ff",
+    series: ["#1d4ed8", "#15803d", "#b7791f", "#c2410c", "#0369a1", "#6d28d9"],
   },
   blue: {
     label: "Azul",
     accent: "#2563eb",
     soft: "#eff6ff",
-    series: ["#2563eb", "#0f766e", "#dc2626", "#9333ea", "#ca8a04", "#0891b2"],
+    series: ["#2563eb", "#15803d", "#c2410c", "#6d28d9", "#b7791f", "#0891b2"],
   },
   violet: {
     label: "Violeta",
     accent: "#7c3aed",
     soft: "#f5f3ff",
-    series: ["#7c3aed", "#0f766e", "#2563eb", "#d97706", "#be123c", "#15803d"],
+    series: ["#7c3aed", "#1d4ed8", "#15803d", "#b7791f", "#c2410c", "#0369a1"],
   },
   graphite: {
     label: "Grafite",
     accent: "#334155",
     soft: "#f8fafc",
-    series: ["#334155", "#0f766e", "#2563eb", "#d97706", "#7c3aed", "#be123c"],
+    series: ["#334155", "#1d4ed8", "#15803d", "#b7791f", "#6d28d9", "#c2410c"],
   },
 };
 

@@ -117,3 +117,55 @@
   border-color: #fecaca;
   color: var(--danger);
 }
+
+@media (max-width: 760px) {
+  .report-strip,
+  .sample-strip,
+  .history-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-strip > div:first-child,
+  .sample-strip > div:first-child,
+  .history-strip > div:first-child {
+    width: 100%;
+  }
+
+  .report-actions,
+  .sample-strip nav,
+  .history-list {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .report-actions button,
+  .sample-action,
+  .sample-action button,
+  .sample-action a {
+    width: 100%;
+  }
+
+  .report-actions button {
+    justify-content: center;
+  }
+
+  .sample-action {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 52px;
+  }
+
+  .history-list article {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .history-list span {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .history-strip > button {
+    align-self: flex-end;
+  }
+}

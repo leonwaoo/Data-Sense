@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, Sparkles, UploadCloud } from "lucide-react";
+import { ArrowRight, Download, FileSpreadsheet, SearchCheck, Sparkles, UploadCloud } from "lucide-react";
 import type { DragEvent } from "react";
 import { SUPPORTED_FILE_ACCEPT } from "../../constants";
 import type { SampleFile } from "../../constants";
@@ -28,11 +28,25 @@ export function UploadView({
         <span className="eyebrow">
           <Sparkles size={15} /> DataSense
         </span>
-        <h1>Transforme planilhas em respostas, graficos e alertas de qualidade.</h1>
+        <h1>Leve uma planilha bruta para uma leitura executiva clara em poucos minutos.</h1>
         <p>
-          Envie CSV, Excel, TSV, TXT ou JSON tabular e acompanhe a evolucao mes a mes com leituras gerenciais
-          calculadas diretamente no seu arquivo.
+          Envie CSV, Excel, TSV, TXT ou JSON tabular. O DataSense identifica o contexto do arquivo, monta a leitura
+          inicial, mostra os principais movimentos e abre caminho para graficos, chat e exportacao.
         </p>
+        <div className="upload-flow">
+          <article>
+            <strong>1. Envie</strong>
+            <span>Carregue a planilha ou use um exemplo pronto para demo.</span>
+          </article>
+          <article>
+            <strong>2. Entenda</strong>
+            <span>Receba contexto, risco, oportunidade e comparativos automaticamente.</span>
+          </article>
+          <article>
+            <strong>3. Aja</strong>
+            <span>Explore graficos, pergunte aos dados e exporte a leitura executiva.</span>
+          </article>
+        </div>
       </div>
 
       <label
@@ -58,18 +72,41 @@ export function UploadView({
         />
       </label>
 
+      <div className="upload-expectations">
+        <article>
+          <SearchCheck size={18} />
+          <div>
+            <strong>O que voce recebe logo depois</strong>
+            <p>Perfil do arquivo, diagnostico gerencial, leitura por periodo, dashboard inicial e perguntas sugeridas.</p>
+          </div>
+        </article>
+        <article>
+          <ArrowRight size={18} />
+          <div>
+            <strong>Quando vale usar os exemplos</strong>
+            <p>Para demonstrar o produto rapidamente, validar layouts e testar vendas, compras, clientes e estoque.</p>
+          </div>
+        </article>
+      </div>
+
       <div className="upload-samples">
-        <span>Ou comece com um exemplo:</span>
-        <nav aria-label="Arquivos de teste">
+        <span>Comece por um cenario pronto para contar a historia do produto:</span>
+        <nav aria-label="Arquivos de teste" className="sample-card-grid">
           {samples.map((file) => (
-            <span className="sample-action" key={file.href}>
-              <button disabled={isUploading} onClick={() => onSampleUpload(file)} type="button">
-                {file.label}
-              </button>
-              <a aria-label={`Baixar ${file.label}`} download href={file.href}>
-                <Download size={15} />
-              </a>
-            </span>
+            <article className="sample-card" key={file.href}>
+              <div>
+                <strong>{file.label}</strong>
+                <p>{file.description}</p>
+              </div>
+              <span className="sample-action">
+                <button disabled={isUploading} onClick={() => onSampleUpload(file)} type="button">
+                  Abrir exemplo
+                </button>
+                <a aria-label={`Baixar ${file.label}`} download href={file.href}>
+                  <Download size={15} />
+                </a>
+              </span>
+            </article>
           ))}
         </nav>
       </div>

@@ -188,6 +188,11 @@
   justify-content: space-between;
 }
 
+.content-header-copy {
+  display: grid;
+  gap: 4px;
+}
+
 .content-header h1 {
   font-size: clamp(1.7rem, 2vw, 2.1rem);
   letter-spacing: -0.02em;
@@ -224,6 +229,43 @@
   animation: section-fade 0.28s ease;
 }
 
+.context-strip {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.context-strip article {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(207, 198, 177, 0.82);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+}
+
+.context-strip span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.context-strip strong {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-strip small {
+  color: var(--text-2);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .section-stack {
   display: flex;
   flex-direction: column;
@@ -247,20 +289,30 @@
   }
 
   .sidebar {
+    align-items: stretch;
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 14px;
     height: auto;
+    padding: 16px 14px;
     position: static;
+  }
+
+  .sidebar-brand,
+  .sidebar-newfile {
+    flex: 1 1 calc(50% - 8px);
   }
 
   .sidebar-nav {
     flex-direction: row;
     flex-wrap: wrap;
     flex: 1 1 100%;
+    gap: 8px;
   }
 
   .sidebar-link {
-    width: auto;
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
   }
 
   .sidebar-link small {
@@ -269,5 +321,58 @@
 
   .sidebar-footer {
     flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content {
+    padding: 20px 14px 40px;
+  }
+
+  .content-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .context-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .content-header > div,
+  .content-header p {
+    width: 100%;
+  }
+
+  .header-upload {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .sidebar-brand,
+  .sidebar-newfile,
+  .sidebar-link {
+    flex: 1 1 100%;
+  }
+
+  .context-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-brand {
+    padding: 2px 4px;
+  }
+
+  .sidebar-link {
+    width: 100%;
+  }
+
+  .sidebar-dataset strong {
+    max-width: none;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .context-strip strong {
+    white-space: normal;
   }
 }

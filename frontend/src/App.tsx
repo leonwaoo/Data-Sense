@@ -55,13 +55,17 @@ const ReportsSection = lazy(async () => {
   return { default: module.ReportsSection };
 });
 
+function firstAvailableText(...values: Array<string | null | undefined>) {
+  return values.find((value) => value && value.trim()) ?? "n/d";
+}
+
 const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
-  overview: { title: "Inicio", subtitle: "Leitura simples para entender o que merece atencao" },
-  diagnostic: { title: "Diagnostico gerencial", subtitle: "Causa raiz, impacto e acoes recomendadas" },
-  dashboard: { title: "Graficos", subtitle: "Visualizacoes simples para explorar o arquivo" },
-  details: { title: "Detalhes", subtitle: "Indicadores, qualidade e estrutura tecnica do arquivo" },
-  chat: { title: "Chat analitico", subtitle: "Pergunte aos dados em linguagem natural" },
-  reports: { title: "Relatorios", subtitle: "Exportacoes, arquivos de teste e historico" },
+  overview: { title: "Inicio", subtitle: "Resumo inicial para saber o que mudou, onde olhar e qual acao priorizar" },
+  diagnostic: { title: "Diagnostico gerencial", subtitle: "Causa raiz provavel, impacto do movimento e acoes recomendadas" },
+  dashboard: { title: "Graficos", subtitle: "Painel visual para confirmar movimentos, comparar recortes e aplicar filtros" },
+  details: { title: "Detalhes", subtitle: "Estrutura do arquivo, confianca dos dados e indicadores usados na leitura" },
+  chat: { title: "Chat analitico", subtitle: "Pergunte em linguagem natural para aprofundar a analise do arquivo" },
+  reports: { title: "Relatorios", subtitle: "Exportacoes, exemplos prontos e historico para demonstracoes" },
 };
 
 export function App() {
@@ -244,6 +248,10 @@ export function App() {
   }
 
   const meta = SECTION_META[section];
+  const domainLabel = firstAvailableText(dataset?.managerial_analysis?.context.domain.label, dashboard?.domain.label);
+  const primaryMetric = firstAvailableText(dataset?.managerial_analysis?.context.metric_map.primary_metric);
+  const periodLabel = firstAvailableText(dataset?.managerial_analysis?.context.time.label);
+  const qualityLabel = dataset ? `${dataset.quality.score}/100` : "n/d";
 
   return (
     <div className="app-shell">
@@ -268,7 +276,7 @@ export function App() {
       <main className="app-content">
         {dataset ? (
           <header className="content-header">
-            <div>
+            <div className="content-header-copy">
               <h1>{meta.title}</h1>
               <p>{meta.subtitle}</p>
             </div>
@@ -284,6 +292,31 @@ export function App() {
             <AlertCircle size={16} />
             {error}
           </div>
+        ) : null}
+
+        {dataset ? (
+          <section className="context-strip" aria-label="Resumo do arquivo carregado">
+            <article>
+              <span>Arquivo</span>
+              <strong>{dataset.file_name}</strong>
+              <small>{dataset.profile.rows.toLocaleString("pt-BR")} linhas e {dataset.profile.columns} colunas</small>
+            </article>
+            <article>
+              <span>Contexto</span>
+              <strong>{domainLabel}</strong>
+              <small>Leitura detectada automaticamente a partir da estrutura do arquivo</small>
+            </article>
+            <article>
+              <span>Indicador principal</span>
+              <strong>{primaryMetric}</strong>
+              <small>Base usada na leitura executiva e nos comparativos</small>
+            </article>
+            <article>
+              <span>Periodo e confianca</span>
+              <strong>{periodLabel}</strong>
+              <small>Qualidade dos dados: {qualityLabel}</small>
+            </article>
+          </section>
         ) : null}
 
         <div className="content-body" key={dataset ? section : "upload"}>

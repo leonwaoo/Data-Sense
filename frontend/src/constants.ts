@@ -53,11 +53,36 @@ export const fallbackSuggestedQuestions = [
 ];
 
 export const sampleFiles = [
-  { label: "Vendas CSV", fileName: "vendas_demo.csv", href: "/samples/vendas_demo.csv" },
-  { label: "Vendas Excel", fileName: "vendas_demo.xlsx", href: "/samples/vendas_demo.xlsx" },
-  { label: "Compras Excel", fileName: "compras_demo.xlsx", href: "/samples/compras_demo.xlsx" },
-  { label: "Clientes JSON", fileName: "clientes_demo.json", href: "/samples/clientes_demo.json" },
-  { label: "Estoque TSV", fileName: "estoque_financeiro_demo.tsv", href: "/samples/estoque_financeiro_demo.tsv" },
+  {
+    label: "Vendas CSV",
+    fileName: "vendas_demo.csv",
+    href: "/samples/vendas_demo.csv",
+    description: "Receita por mes, produto, regiao e canal para demonstrar leitura comercial.",
+  },
+  {
+    label: "Vendas Excel",
+    fileName: "vendas_demo.xlsx",
+    href: "/samples/vendas_demo.xlsx",
+    description: "Mesmo cenario de vendas em Excel para validar upload corporativo comum.",
+  },
+  {
+    label: "Compras Excel",
+    fileName: "compras_demo.xlsx",
+    href: "/samples/compras_demo.xlsx",
+    description: "Compras, fornecedores e custos para leitura de abastecimento e caixa.",
+  },
+  {
+    label: "Clientes JSON",
+    fileName: "clientes_demo.json",
+    href: "/samples/clientes_demo.json",
+    description: "Base tabular em JSON para demonstrar flexibilidade de ingestao.",
+  },
+  {
+    label: "Estoque TSV",
+    fileName: "estoque_financeiro_demo.tsv",
+    href: "/samples/estoque_financeiro_demo.tsv",
+    description: "Estoque, entradas e saidas para diagnostico operacional e risco.",
+  },
 ];
 
 export type SampleFile = (typeof sampleFiles)[number];

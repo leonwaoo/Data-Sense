@@ -145,6 +145,22 @@
   max-width: 860px;
 }
 
+.executive-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.executive-context-strip span {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 7px 12px;
+}
+
 .executive-card-grid {
   display: grid;
   gap: 14px;
@@ -182,6 +198,31 @@
 .executive-card-grid p {
   color: var(--text-2);
   font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.executive-next-steps {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.executive-next-steps article {
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.executive-next-steps strong {
+  font-size: 0.88rem;
+}
+
+.executive-next-steps p {
+  color: var(--text-2);
+  font-size: 0.82rem;
   line-height: 1.5;
 }
 
@@ -233,4 +274,15 @@
   justify-content: center;
   min-height: 180px;
   text-align: center;
+}
+
+@media (max-width: 640px) {
+  .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .executive-context-strip span {
+    width: 100%;
+  }
 }

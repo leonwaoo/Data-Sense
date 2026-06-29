@@ -49,6 +49,39 @@
   max-width: 540px;
 }
 
+.upload-flow {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 8px;
+  text-align: left;
+}
+
+.upload-flow article,
+.upload-expectations article,
+.sample-card {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(207, 198, 177, 0.78);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.upload-flow article {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.upload-flow strong {
+  font-size: 0.88rem;
+}
+
+.upload-flow span {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .dropzone {
   align-items: center;
   backdrop-filter: blur(12px);
@@ -116,6 +149,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
 }
 
 .upload-samples > span {
@@ -123,17 +157,70 @@
   font-size: 0.84rem;
 }
 
-.upload-samples nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
+.sample-card-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  width: 100%;
 }
 
 .sample-action {
   align-items: stretch;
   display: inline-flex;
   overflow: hidden;
+}
+
+.sample-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 16px;
+  text-align: left;
+}
+
+.sample-card strong {
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 6px;
+}
+
+.sample-card p {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.upload-expectations {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
+.upload-expectations article {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  text-align: left;
+}
+
+.upload-expectations svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.upload-expectations strong {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.upload-expectations p {
+  color: var(--text-2);
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 .sample-action button,
@@ -164,4 +251,19 @@
   background: var(--accent-soft);
   border-color: #99e6d6;
   color: var(--accent-strong);
+}
+
+@media (max-width: 760px) {
+  .upload-flow,
+  .upload-expectations {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-hero {
+    padding: 22px 18px 6px;
+  }
+
+  .sample-card-grid {
+    grid-template-columns: 1fr;
+  }
 }

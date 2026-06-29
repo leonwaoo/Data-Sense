@@ -82,3 +82,30 @@
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+@media (max-width: 760px) {
+  .suggestions {
+    margin-bottom: 12px;
+  }
+
+  .suggestions button {
+    width: 100%;
+  }
+
+  .ask-row {
+    flex-direction: column;
+  }
+
+  .ask-row button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .answer-box {
+    padding: 14px;
+  }
+
+  .answer-box p {
+    font-size: 0.9rem;
+  }
+}

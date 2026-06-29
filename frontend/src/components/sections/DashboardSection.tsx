@@ -81,6 +81,15 @@ export function DashboardSection({
   const highlightKpis = dashboard?.kpis.slice(0, 4) ?? [];
   const visibleRows = dashboard?.filters.rows_after_filter ?? 0;
   const totalRows = dashboard?.filters.rows_before_filter ?? 0;
+  const appliedDateLabel = dashboard?.filters.date?.selected_from && dashboard?.filters.date?.selected_to
+    ? `${dashboard.filters.date.selected_from} ate ${dashboard.filters.date.selected_to}`
+    : null;
+  const activeCategoryFilters = dashboard?.filters.categories.filter((category) => category.selected.length) ?? [];
+  const filterSummary = appliedDateLabel
+    ? `Periodo ativo: ${appliedDateLabel}`
+    : activeCategoryFilters.length
+      ? `${activeCategoryFilters.length} filtro(s) de categoria aplicados`
+      : "Visao completa do arquivo";
 
   function readSelection(chart: DashboardChart, selection: ChartPointSelection): DrilldownState["reading"] {
     const pointInsight = chart.point_insights?.[selection.label];
@@ -294,6 +303,18 @@ export function DashboardSection({
           <strong>{orderedCharts.length}</strong>
           <small>{hiddenCharts.size ? `${hiddenCharts.size} oculto(s)` : "todos visiveis"}</small>
         </article>
+      </div>
+
+      <div className="dashboard-context-banner">
+        <div>
+          <strong>Recorte em exibicao</strong>
+          <span>{filterSummary}</span>
+        </div>
+        <small>
+          {dashboard.filters.applied_count
+            ? "Os graficos e KPIs ja refletem os filtros ativos."
+            : "Nenhum filtro ativo: use o painel de ajustes para focar em um periodo ou recorte."}
+        </small>
       </div>
 
       {highlightKpis.length ? (

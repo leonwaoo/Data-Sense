@@ -23,6 +23,9 @@ export function ManagerialInsightsSection({
   const dimensionNarratives = analysis.dimension_narratives ?? rootCause?.dimension_narratives ?? [];
   const comparativeCards = analysis.comparative_summary?.cards ?? [];
   const comparativeReadings = analysis.comparative_summary?.readings ?? [];
+  const mainAlert = analysis.alerts[0] ?? "Sem alerta critico adicional nesta leitura.";
+  const mainRecommendation = analysis.recommendations[0] ?? "Validar o contexto do movimento com a equipe responsavel.";
+  const bestSignal = comparativeCards.find((card) => card.tone === "good")?.detail ?? comparativeReadings[0] ?? "Compare os recortes para confirmar a melhor oportunidade.";
   const aiStatusLabel = aiReview?.ai_status === "completed"
     ? `IA ${aiReview.model ?? "ativa"}`
     : aiReview?.ai_status === "not_configured"
@@ -52,6 +55,21 @@ export function ManagerialInsightsSection({
         {analysis.summary.slice(0, 4).map((item) => (
           <p key={item}>{item}</p>
         ))}
+      </div>
+
+      <div className="managerial-decision-strip">
+        <article>
+          <span>Maior risco</span>
+          <strong>{mainAlert}</strong>
+        </article>
+        <article>
+          <span>Melhor oportunidade</span>
+          <strong>{bestSignal}</strong>
+        </article>
+        <article>
+          <span>Acao recomendada</span>
+          <strong>{mainRecommendation}</strong>
+        </article>
       </div>
 
       {comparativeCards.length || comparativeReadings.length ? (

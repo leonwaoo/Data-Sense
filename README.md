@@ -37,6 +37,7 @@ Muitas pessoas e empresas possuem dados em planilhas, mas nao sabem transformar 
 O sistema atuara como um assistente para analise de dados:
 
 - Le CSV, TSV, TXT delimitado, Excel e JSON tabular enviados pelo usuario.
+- Guia a leitura logo no primeiro contato, com onboarding curto, exemplos prontos e expectativa clara do que sera gerado apos o upload.
 - Detecta melhor o cabecalho real em planilhas Excel que possuem linha de titulo antes da tabela.
 - Identifica colunas, tipos de dados, valores ausentes e possiveis problemas.
 - Sugere conversao para colunas de periodo, como mes e trimestre, quando elas aparecem como texto.
@@ -46,6 +47,7 @@ O sistema atuara como um assistente para analise de dados:
 - Monta um dashboard automatico apos o upload com KPIs, evolucao mensal, rankings, nulos e score de qualidade.
 - Permite personalizar o dashboard com titulo, tema, logo, tipo de grafico, ordem dos graficos e graficos ocultos.
 - Recalcula o dashboard com filtros de periodo e categorias, como produto, fornecedor, cliente, categoria, regiao ou canal.
+- Mantem uma faixa de contexto persistente com arquivo, dominio detectado, indicador principal, periodo e score de qualidade para orientar a navegacao.
 - Detecta anomalias e problemas de qualidade.
 - Gera uma auditoria inteligente da confiabilidade da analise, apontando cabecalho suspeito, datas como texto, metricas inadequadas, totais negativos, nulos, duplicatas e outliers.
 - Pode usar IA pelo OpenRouter para revisar a auditoria quando `OPENROUTER_API_KEY` estiver configurada; sem chave, usa regras locais.
@@ -55,6 +57,7 @@ O sistema atuara como um assistente para analise de dados:
 - Exporta relatorio em PDF ou PNG com resumo, qualidade, insights, graficos e recomendacoes.
 - Renderiza graficos reais no relatorio, com mensagem clara quando nao ha dados suficientes para desenhar uma visualizacao.
 - Exporta o dashboard personalizado em PDF via impressao e PNG gerado no navegador.
+- Mostra analise mensal mais gerencial, com selecao por ano, recorte de meses, comparativo com ano anterior e media movel.
 - Exporta pacote Power BI com dados tratados, comparativo mensal, causa raiz, medidas DAX, layout sugerido, modelo de paginas e indicadores executivos.
 - Mantem historico local das ultimas analises carregadas.
 
@@ -219,9 +222,20 @@ Perguntas uteis para teste:
 
 ## Status
 
-Fase atual: MVP funcional em desenvolvimento, com upload por clique ou arrastar/soltar, leitura de CSV/Excel/TSV/TXT/JSON, perfil automatico, dashboard automatico personalizavel, filtros globais, historico local, auditoria de qualidade, chat analitico e sugestoes de graficos.
+Fase atual: MVP demonstravel em refinamento, com foco em clareza de produto, leitura orientada para decisao e experiencia pronta para portfolio, demo e primeiras apresentacoes.
 
-Tambem ja possui exportacao de relatorio em PDF/PNG apos o carregamento do dataset.
+Ja possui:
+
+- upload por clique ou arrastar/soltar;
+- leitura de CSV/Excel/TSV/TXT/JSON;
+- onboarding inicial com exemplos prontos;
+- perfil automatico do dataset;
+- diagnostico gerencial e comparativos mensais;
+- dashboard automatico personalizavel com filtros globais;
+- historico local;
+- auditoria de qualidade;
+- chat analitico;
+- exportacao de relatorio em PDF/PNG e pacote Power BI.
 
 ## Contribuindo e licenca
 

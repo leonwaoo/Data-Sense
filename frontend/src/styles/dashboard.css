@@ -131,6 +131,29 @@
 .dashboard-kpi-chip.tone-danger { border-top-color: var(--danger); }
 .dashboard-kpi-chip.tone-accent { border-top-color: var(--dashboard-accent, var(--accent)); }
 
+.dashboard-context-banner {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.dashboard-context-banner strong {
+  display: block;
+  font-size: 0.84rem;
+}
+
+.dashboard-context-banner span,
+.dashboard-context-banner small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .dashboard-controls {
   background: rgba(248, 246, 240, 0.82);
   border: 1px solid var(--border);
@@ -888,6 +911,11 @@
     grid-template-columns: 1fr;
   }
 
+  .dashboard-context-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .dashboard-export-actions {
     flex-direction: row;
     flex-wrap: wrap;
@@ -908,6 +936,88 @@
 
   .chart-donut-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-heading > div {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .dashboard-heading .domain-pill {
+    white-space: normal;
+  }
+
+  .dashboard-controls summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-controls summary span {
+    margin-left: 0;
+  }
+
+  .date-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions,
+  .logo-actions,
+  .chart-card-heading,
+  .chart-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .logo-picker,
+  .filter-actions button,
+  .dashboard-export-actions button,
+  .chart-type-toggle,
+  .chart-actions > button {
+    width: 100%;
+  }
+
+  .chart-actions > button {
+    height: 36px;
+  }
+
+  .dashboard-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-chart-card,
+  .dashboard-featured-chart,
+  .dashboard-drilldown-panel,
+  .dashboard-insights {
+    padding: 14px;
+  }
+
+  .chart-frame {
+    min-height: 170px;
+    padding: 8px 4px 4px;
+  }
+
+  .chart-focus-note {
+    align-items: flex-start;
+    border-radius: 14px;
+    bottom: 8px;
+    flex-direction: column;
+    gap: 2px;
+    max-width: calc(100% - 16px);
+    left: 8px;
+  }
+
+  .chart-direct-legend span {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .chart-direct-legend strong {
+    grid-column: 2;
+  }
+
+  .dashboard-drilldown-heading strong {
+    font-size: 1rem;
   }
 }
 

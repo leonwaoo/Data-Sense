@@ -2,12 +2,12 @@ import { FileText, LayoutDashboard, LineChart, MessageSquareText, Plus, ShieldCh
 import type { SectionKey, UploadResponse } from "../../types";
 
 const NAV_ITEMS: { key: SectionKey; label: string; icon: typeof LineChart; hint: string }[] = [
-  { key: "overview", label: "Inicio", icon: LineChart, hint: "Leitura simples para decisao" },
-  { key: "diagnostic", label: "Diagnostico", icon: Stethoscope, hint: "Causa raiz e acoes" },
-  { key: "dashboard", label: "Graficos", icon: LayoutDashboard, hint: "Visualizacao dos dados" },
-  { key: "details", label: "Detalhes", icon: FileText, hint: "Indicadores e qualidade" },
-  { key: "chat", label: "Chat analitico", icon: MessageSquareText, hint: "Pergunte aos dados" },
-  { key: "reports", label: "Relatorios", icon: ShieldCheck, hint: "Exportar e historico" },
+  { key: "overview", label: "Inicio", icon: LineChart, hint: "O que mudou e o que fazer" },
+  { key: "diagnostic", label: "Diagnostico", icon: Stethoscope, hint: "Causa raiz, risco e impacto" },
+  { key: "dashboard", label: "Graficos", icon: LayoutDashboard, hint: "Confirmar movimentos e recortes" },
+  { key: "details", label: "Detalhes", icon: FileText, hint: "Qualidade, estrutura e metricas" },
+  { key: "chat", label: "Chat analitico", icon: MessageSquareText, hint: "Aprofundar perguntas de negocio" },
+  { key: "reports", label: "Relatorios", icon: ShieldCheck, hint: "Exportar e apresentar a leitura" },
 ];
 
 export function Sidebar({
@@ -21,6 +21,9 @@ export function Sidebar({
   onNavigate: (section: SectionKey) => void;
   onNewFile: () => void;
 }) {
+  const domain = dataset?.managerial_analysis?.context.domain.label ?? "Sem contexto";
+  const metric = dataset?.managerial_analysis?.context.metric_map.primary_metric ?? "Sem indicador principal";
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -64,7 +67,7 @@ export function Sidebar({
             <Sparkles size={15} />
             <div>
               <strong>{dataset.file_name}</strong>
-              <small>Arquivo pronto para analise</small>
+              <small>{domain} • {metric}</small>
             </div>
           </div>
         ) : (

@@ -225,3 +225,12 @@
   font-size: 0.78rem;
   font-weight: 700;
 }
+
+.section-loading {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+  min-height: 180px;
+  text-align: center;
+}

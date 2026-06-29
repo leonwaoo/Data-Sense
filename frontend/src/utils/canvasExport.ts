@@ -7,6 +7,9 @@ export async function exportDashboardAsPng(
   charts: DashboardChart[],
   theme: { accent: string; soft: string; series: string[] },
 ) {
+  const selectedFrom = dashboard.filters.date?.selected_from;
+  const selectedTo = dashboard.filters.date?.selected_to;
+  const periodLabel = selectedFrom && selectedTo ? `Periodo: ${selectedFrom} ate ${selectedTo}` : "Periodo: visao completa";
   const width = 1400;
   const chartRows = Math.ceil(Math.min(charts.length, 4) / 2);
   const height = 620 + chartRows * 300 + Math.ceil(dashboard.insights.length / 2) * 54;
@@ -38,9 +41,12 @@ export async function exportDashboardAsPng(
   context.fillStyle = "#64748b";
   context.font = "500 18px Arial";
   drawWrappedText(context, dashboard.subtitle, 150, 116, 980, 24);
+  context.fillStyle = "#526173";
+  context.font = "700 14px Arial";
+  context.fillText(periodLabel, 150, 144);
   drawPill(context, dashboard.domain.label, width - 305, 70, 230, theme.accent, theme.soft);
 
-  let y = 160;
+  let y = 176;
   drawRoundRect(context, 70, y, 760, 92, 16, theme.soft, "#dbe5ef");
   context.fillStyle = theme.accent;
   context.font = "800 15px Arial";

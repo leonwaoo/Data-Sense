@@ -4,15 +4,20 @@
   flex-direction: column;
   gap: 22px;
   margin: 0 auto;
-  max-width: 640px;
+  max-width: 760px;
   padding: clamp(20px, 6vh, 64px) 0;
   text-align: center;
 }
 
 .upload-hero {
+  background:
+    radial-gradient(circle at top, rgba(15, 118, 110, 0.08), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0));
+  border-radius: calc(var(--radius) + 6px);
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 26px 24px 8px;
 }
 
 .eyebrow {
@@ -46,10 +51,11 @@
 
 .dropzone {
   align-items: center;
-  background: var(--surface);
-  border: 1.5px dashed var(--border-strong);
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1.5px dashed #b7c7c1;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -62,7 +68,7 @@
 
 .dropzone:hover,
 .dropzone.is-dragover {
-  background: var(--accent-soft);
+  background: linear-gradient(180deg, rgba(232, 246, 240, 0.92), rgba(255, 255, 255, 0.92));
   border-color: var(--accent);
   transform: translateY(-2px);
 }

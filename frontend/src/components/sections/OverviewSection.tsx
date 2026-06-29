@@ -30,7 +30,13 @@ function directionText(direction: string | undefined) {
   return "Mudou";
 }
 
-export function OverviewSection({ dataset }: { dataset: UploadResponse }) {
+export function OverviewSection({
+  dataset,
+  onApplyPeriodToDashboard,
+}: {
+  dataset: UploadResponse;
+  onApplyPeriodToDashboard?: (period: { date_from: string; date_to: string }) => void;
+}) {
   const analysis = dataset.managerial_analysis;
   const rootCause = analysis?.root_cause_analysis;
   const topContributor = rootCause?.primary_contributor?.name;
@@ -83,7 +89,7 @@ export function OverviewSection({ dataset }: { dataset: UploadResponse }) {
         </div>
       </section>
 
-      {analysis ? <MonthlyAnalysisSection analysis={analysis} /> : null}
+      {analysis ? <MonthlyAnalysisSection analysis={analysis} onApplyPeriodToDashboard={onApplyPeriodToDashboard} /> : null}
     </div>
   );
 }

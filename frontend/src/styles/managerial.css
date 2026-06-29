@@ -26,6 +26,14 @@
   gap: 16px;
 }
 
+.monthly-control-bar {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+}
+
 .monthly-focus-heading,
 .managerial-heading {
   align-items: center;
@@ -205,6 +213,105 @@
   grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
 }
 
+.monthly-year-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monthly-year-selector button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 8px 14px;
+}
+
+.monthly-year-selector button:hover,
+.monthly-year-selector button.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.monthly-range-selector {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.monthly-range-selector label {
+  display: grid;
+  gap: 4px;
+}
+
+.monthly-range-selector span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.monthly-range-selector select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.monthly-apply-button {
+  align-items: center;
+  background: linear-gradient(135deg, var(--accent), #155e75);
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.monthly-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.monthly-summary-grid article,
+.monthly-insights-grid article {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 250, 252, 0.96));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.monthly-summary-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.monthly-summary-grid strong {
+  font-size: 1.08rem;
+}
+
+.monthly-summary-grid small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .monthly-selector button {
   align-items: flex-start;
   background: var(--surface);
@@ -248,6 +355,12 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 16px;
+}
+
+.monthly-chart-card-compare {
+  background:
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 251, 0.98));
 }
 
 .monthly-chart-card > div {
@@ -305,6 +418,24 @@
   gap: 10px;
 }
 
+.monthly-reading-metrics {
+  display: grid;
+  gap: 8px;
+}
+
+.monthly-reading-metrics article {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.monthly-reading-metrics article strong {
+  font-size: 0.86rem;
+}
+
 .monthly-reading-card p {
   color: var(--text-2);
   font-size: 0.88rem;
@@ -320,6 +451,33 @@
   color: var(--muted);
   font-size: 0.78rem;
   margin-top: auto;
+}
+
+.monthly-insights-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.monthly-insights-grid article > div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.monthly-insights-grid svg {
+  color: var(--accent);
+}
+
+.monthly-insights-grid strong {
+  font-size: 0.9rem;
+}
+
+.monthly-insights-grid p {
+  color: var(--text-2);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .monthly-detail-panel {
@@ -1245,6 +1403,17 @@
 }
 
 @media (max-width: 760px) {
+  .monthly-control-bar,
+  .monthly-range-selector {
+    flex-direction: column;
+  }
+
+  .monthly-range-selector label,
+  .monthly-range-selector select,
+  .monthly-apply-button {
+    width: 100%;
+  }
+
   .managerial-ai-heading,
   .managerial-ai-actions,
   .managerial-ai-list article > div {

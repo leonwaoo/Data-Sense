@@ -1,5 +1,5 @@
 import { AlertCircle, UploadCloud } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import {
   askQuestion,
@@ -12,12 +12,6 @@ import {
 import { SUPPORTED_FILE_ACCEPT, defaultDashboardFilters, sampleFiles } from "./constants";
 import type { SampleFile } from "./constants";
 import { Sidebar } from "./components/layout/Sidebar";
-import { OverviewSection } from "./components/sections/OverviewSection";
-import { DiagnosticSection } from "./components/sections/DiagnosticSection";
-import { DashboardSection } from "./components/sections/DashboardSection";
-import { DetailsSection } from "./components/sections/DetailsSection";
-import { ChatSection } from "./components/sections/ChatSection";
-import { ReportsSection } from "./components/sections/ReportsSection";
 import { UploadView } from "./components/sections/UploadView";
 import { clearHistory, loadHistory, saveHistory } from "./utils/history";
 import type {
@@ -30,6 +24,36 @@ import type {
   SectionKey,
   UploadResponse,
 } from "./types";
+
+const OverviewSection = lazy(async () => {
+  const module = await import("./components/sections/OverviewSection");
+  return { default: module.OverviewSection };
+});
+
+const DiagnosticSection = lazy(async () => {
+  const module = await import("./components/sections/DiagnosticSection");
+  return { default: module.DiagnosticSection };
+});
+
+const DashboardSection = lazy(async () => {
+  const module = await import("./components/sections/DashboardSection");
+  return { default: module.DashboardSection };
+});
+
+const DetailsSection = lazy(async () => {
+  const module = await import("./components/sections/DetailsSection");
+  return { default: module.DetailsSection };
+});
+
+const ChatSection = lazy(async () => {
+  const module = await import("./components/sections/ChatSection");
+  return { default: module.ChatSection };
+});
+
+const ReportsSection = lazy(async () => {
+  const module = await import("./components/sections/ReportsSection");
+  return { default: module.ReportsSection };
+});
 
 const SECTION_META: Record<SectionKey, { title: string; subtitle: string }> = {
   overview: { title: "Inicio", subtitle: "Leitura simples para entender o que merece atencao" },
@@ -152,6 +176,15 @@ export function App() {
     void handleApplyDashboardFilters(defaultDashboardFilters);
   }
 
+  function handleApplyManagerialPeriod(period: { date_from: string; date_to: string }) {
+    setSection("dashboard");
+    void handleApplyDashboardFilters({
+      ...dashboardFilters,
+      date_from: period.date_from,
+      date_to: period.date_to,
+    });
+  }
+
   function handleClearHistory() {
     clearHistory();
     setHistory([]);
@@ -265,50 +298,54 @@ export function App() {
               onSampleUpload={(sample) => void handleSampleUpload(sample)}
               onUpload={(file) => void handleUpload(file)}
             />
-          ) : section === "overview" ? (
-            <OverviewSection dataset={dataset} />
-          ) : section === "diagnostic" ? (
-            <DiagnosticSection
-              aiReview={managerialAiReview}
-              aiModel={managerialAiModel}
-              analysis={dataset.managerial_analysis}
-              isManagerialAiLoading={isManagerialAiLoading}
-              onManagerialAiModelChange={setManagerialAiModel}
-              onManagerialAiReview={(model) => void handleManagerialAiReview(model)}
-            />
-          ) : section === "dashboard" ? (
-            <DashboardSection
-              dashboard={dashboard}
-              filters={dashboardFilters}
-              isLoading={isDashboardLoading}
-              settings={dashboardSettings}
-              onApplyFilters={(filters) => void handleApplyDashboardFilters(filters)}
-              onResetFilters={handleResetDashboardFilters}
-              onSettingsChange={setDashboardSettings}
-            />
-          ) : section === "details" ? (
-            <DetailsSection dashboard={dashboard} dataset={dataset} />
-          ) : section === "chat" ? (
-            <ChatSection
-              answer={answer}
-              dataset={dataset}
-              isAsking={isAsking}
-              question={question}
-              onAsk={handleAsk}
-              onQuestionChange={setQuestion}
-            />
           ) : (
-            <ReportsSection
-              dataset={dataset}
-              exportingFormat={exportingFormat}
-              history={history}
-              isUploading={isUploading}
-              samples={sampleFiles}
-              onClearHistory={handleClearHistory}
-              onDownloadPowerBi={() => void handleDownloadPowerBi()}
-              onDownloadReport={(format) => void handleDownloadReport(format)}
-              onSampleUpload={(sample) => void handleSampleUpload(sample)}
-            />
+            <Suspense fallback={<div className="panel section-loading">Carregando secao...</div>}>
+              {section === "overview" ? (
+                <OverviewSection dataset={dataset} onApplyPeriodToDashboard={handleApplyManagerialPeriod} />
+              ) : section === "diagnostic" ? (
+                <DiagnosticSection
+                  aiReview={managerialAiReview}
+                  aiModel={managerialAiModel}
+                  analysis={dataset.managerial_analysis}
+                  isManagerialAiLoading={isManagerialAiLoading}
+                  onManagerialAiModelChange={setManagerialAiModel}
+                  onManagerialAiReview={(model) => void handleManagerialAiReview(model)}
+                />
+              ) : section === "dashboard" ? (
+                <DashboardSection
+                  dashboard={dashboard}
+                  filters={dashboardFilters}
+                  isLoading={isDashboardLoading}
+                  settings={dashboardSettings}
+                  onApplyFilters={(filters) => void handleApplyDashboardFilters(filters)}
+                  onResetFilters={handleResetDashboardFilters}
+                  onSettingsChange={setDashboardSettings}
+                />
+              ) : section === "details" ? (
+                <DetailsSection dashboard={dashboard} dataset={dataset} />
+              ) : section === "chat" ? (
+                <ChatSection
+                  answer={answer}
+                  dataset={dataset}
+                  isAsking={isAsking}
+                  question={question}
+                  onAsk={handleAsk}
+                  onQuestionChange={setQuestion}
+                />
+              ) : (
+                <ReportsSection
+                  dataset={dataset}
+                  exportingFormat={exportingFormat}
+                  history={history}
+                  isUploading={isUploading}
+                  samples={sampleFiles}
+                  onClearHistory={handleClearHistory}
+                  onDownloadPowerBi={() => void handleDownloadPowerBi()}
+                  onDownloadReport={(format) => void handleDownloadReport(format)}
+                  onSampleUpload={(sample) => void handleSampleUpload(sample)}
+                />
+              )}
+            </Suspense>
           )}
         </div>
       </main>
